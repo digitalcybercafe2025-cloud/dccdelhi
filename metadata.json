@@ -1,0 +1,8 @@
+{
+  "name": "Digital Mangolpuri: Premium Seva Gateway",
+  "description": "An advanced digital services platform for government and academic documentation with AI-powered validation, smart tracking, and automated notifications.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

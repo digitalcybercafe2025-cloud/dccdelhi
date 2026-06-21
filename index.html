@@ -1,0 +1,68 @@
+
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Digital Cyber Cafe | Official Digital Services Gateway</title>
+    <meta name="theme-color" content="#003380">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <style>
+      :root {
+        --brand-primary: #003380;
+        --brand-gradient: linear-gradient(135deg, #003380 0%, #00255c 100%);
+      }
+      body {
+        margin: 0;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        background-color: #ffffff;
+        color: #0F172A;
+        overflow-x: hidden;
+      }
+      .glass-nav {
+        background: rgba(255, 255, 255, 0.8);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+      }
+      .dark .glass-nav {
+        background: rgba(15, 23, 42, 0.8);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      }
+    </style>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" crossorigin="anonymous">
+    <!-- Swiper CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11.1.4/swiper-bundle.min.css" crossorigin="anonymous" />
+    <link rel="stylesheet" href="/index.css">
+    <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@19.0.0",
+        "react-dom": "https://esm.sh/react-dom@19.0.0",
+        "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
+        "lucide-react": "https://esm.sh/lucide-react@0.463.0?external=react",
+        "recharts": "https://esm.sh/recharts@2.15.0?external=react,react-dom",
+        "html-to-image": "https://esm.sh/html-to-image@1.11.11",
+        "@google/genai": "https://esm.sh/@google/genai@1.41.0",
+        "swiper": "https://esm.sh/swiper@11.1.4",
+        "swiper/react": "https://esm.sh/swiper@11.1.4/react?external=react",
+        "swiper/modules": "https://esm.sh/swiper@11.1.4/modules",
+        "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+        "react/": "https://esm.sh/react@^19.2.4/",
+        "swiper/": "https://esm.sh/swiper@^12.1.1/",
+        "motion": "https://esm.sh/motion@12.34.2",
+        "motion/react": "https://esm.sh/motion@12.34.2/react?external=react"
+      }
+    }
+    </script>
+</head>
+<body class="selection:bg-blue-100 selection:text-blue-900 transition-colors duration-500">
+    <div id="root"></div>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>

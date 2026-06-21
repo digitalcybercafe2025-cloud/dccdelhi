@@ -1,0 +1,212 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+}
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --gov-primary: #003380;
+  --gov-navy: #00255c;
+  --gov-accent: #0056b3;
+  --surface-primary: #FFFFFF;
+  --surface-secondary: #F8FAFC;
+  --surface-accent: #F1F5F9;
+  --secure-glow: rgba(0, 51, 128, 0.05);
+  --luxury-easing: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Premium Brand Gradients */
+  --grad-blue: linear-gradient(135deg, #00255c 0%, #003380 40%, #1e40af 100%);
+  --grad-green: linear-gradient(135deg, #064e3b 0%, #059669 40%, #10b981 100%);
+  --grad-red: linear-gradient(135deg, #881337 0%, #be123c 40%, #e11d48 100%);
+  --grad-orange: linear-gradient(135deg, #7c2d12 0%, #c2410c 40%, #f97316 100%);
+
+  /* Dynamic Theme Variable */
+  --brand-primary: var(--gov-primary);
+  --brand-gradient: var(--grad-blue);
+}
+
+/* Theme Overrides */
+[data-theme='blue'] {
+  --brand-primary: #003380;
+  --brand-gradient: var(--grad-blue);
+}
+
+[data-theme='green'] {
+  --brand-primary: #059669;
+  --brand-gradient: var(--grad-green);
+}
+
+[data-theme='red'] {
+  --brand-primary: #be123c;
+  --brand-gradient: var(--grad-red);
+}
+
+[data-theme='orange'] {
+  --brand-primary: #c2410c;
+  --brand-gradient: var(--grad-orange);
+}
+
+:root,
+.light,
+.light-theme,
+html:not(.dark) {
+  --bg-light: #ffffff;
+  --bg-dark: #0f172a;
+
+  --card-light: #f8fafc;
+  --card-dark: #111827;
+
+  --text-light: #1f2937;
+  --text-dark: #f9fafb;
+
+  --input-light: #ffffff;
+  --input-dark: #1e293b;
+
+  --app-bg: var(--bg-light);
+  --section-bg: #f8fafc;
+  --card-bg: var(--card-light);
+  --text-primary: var(--text-light);
+  --text-secondary: #475569;
+  --text-color: var(--text-light);
+  --input-bg: var(--input-light);
+  --background: var(--bg-light);
+}
+
+.dark,
+.dark-theme,
+html.dark {
+  --bg-dark: #0f172a;
+  --card-dark: #111827;
+  --text-dark: #f9fafb;
+  --input-dark: #1e293b;
+
+  --app-bg: var(--bg-dark);
+  --section-bg: #0f172a;
+  --card-bg: var(--card-dark);
+  --text-primary: var(--text-dark);
+  --text-secondary: #94a3b8;
+  --text-color: var(--text-dark);
+  --input-bg: var(--input-dark);
+  --background: var(--bg-dark);
+}
+
+body,
+body.light-theme {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  background-color: var(--app-bg);
+  background: var(--app-bg);
+  color: var(--text-primary);
+  min-height: 100vh;
+  transition: background-color 0.5s var(--luxury-easing), color 0.5s var(--luxury-easing);
+}
+
+.dark body,
+body.dark-theme,
+html.dark body {
+  background-color: var(--app-bg);
+  background: var(--app-bg);
+  color: var(--text-primary);
+}
+
+.glass-nav {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px) saturate(180%);
+  border-bottom: 1px solid rgba(0, 51, 128, 0.05);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.03);
+  transition: all 0.4s var(--luxury-easing);
+}
+
+.dark .glass-nav {
+  background: rgba(2, 6, 23, 0.85);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
+}
+
+.trust-shadow {
+  box-shadow: 0 20px 50px -15px rgba(0, 0, 0, 0.03);
+}
+
+.luxury-shadow {
+  box-shadow: 0 35px 70px -15px rgba(0, 51, 128, 0.05);
+}
+
+.card-hover-effect {
+  transition: all 0.6s var(--luxury-easing);
+  will-change: transform, box-shadow;
+}
+
+.card-hover-effect:hover {
+  transform: translateY(-10px) scale(1.01);
+  box-shadow: 0 45px 90px -20px rgba(0, 51, 128, 0.08);
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.5);
+}
+
+.swiper-pagination-bullet {
+  background: #cbd5e1 !important;
+  opacity: 1 !important;
+  transition: all 0.5s var(--luxury-easing);
+}
+
+.swiper-pagination-bullet-active {
+  background: var(--brand-primary) !important;
+  width: 32px !important;
+  border-radius: 4px !important;
+}
+
+/* Utility for dynamic theme colors */
+.bg-brand {
+  background-color: var(--brand-primary);
+}
+
+.text-brand {
+  color: var(--brand-primary);
+}
+
+.border-brand {
+  border-color: var(--brand-primary);
+}
+
+.bg-brand-grad {
+  background: var(--brand-gradient);
+}
+
+/* Premium Stat Cards matching screenshot */
+.stat-card-blue {
+  background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%) !important;
+}
+
+.stat-card-green {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+}
+
+.stat-card-orange {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
+}
+
+.stat-card-dark {
+  background: linear-gradient(135deg, #334155 0%, #0f172a 100%) !important;
+}
+
+.theme-input {
+  background-color: var(--input-bg) !important;
+  color: var(--text-color) !important;
+}
