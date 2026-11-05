@@ -1,12 +1,16 @@
 const mongoose = require('mongoose');
+const dotenv = require('dotenv');
+const path = require('path');
 
-const uri = 'mongodb://localhost:27017/digital_cyber_cafe';
+dotenv.config({ path: path.join(__dirname, '.env') });
 
-console.log('Testing connection to:', uri);
+const uri = process.env.MONGO_URI || 'mongodb://localhost:27017/digital_cyber_cafe';
 
-mongoose.connect(uri, { serverSelectionTimeoutMS: 5000 })
+console.log('Testing connection to:', uri.replace(/:([^:@]+)@/, ':****@'));
+
+mongoose.connect(uri, { serverSelectionTimeoutMS: 8000 })
     .then(() => {
-        console.log('Successfully connected to MongoDB!');
+        console.log('Successfully connected to MongoDB Atlas!');
         process.exit(0);
     })
     .catch(err => {
