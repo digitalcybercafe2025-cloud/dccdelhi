@@ -1,9 +1,12 @@
 import axios from 'axios';
 
-const IS_DEV = import.meta.env.DEV;
-const API_URL = IS_DEV
-    ? `${window.location.protocol}//${window.location.hostname}:5000/api`
-    : '/api'; // Adjust for production if necessary
+const API_BASE = import.meta.env.VITE_API_URL
+    ? import.meta.env.VITE_API_URL.replace(/\/+$/, '')
+    : (import.meta.env.DEV
+        ? `${window.location.protocol}//${window.location.hostname}:5000`
+        : 'https://dccdelhi.onrender.com');
+
+const API_URL = `${API_BASE}/api`;
 
 const api = axios.create({
     baseURL: API_URL, // Backend URL
