@@ -1,4 +1,5 @@
 const Service = require('../models/Service');
+const mongoose = require('mongoose');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -57,7 +58,17 @@ const getAllServices = async (req, res) => {
 // @access  Public
 const getServiceById = async (req, res) => {
     try {
-        const service = await Service.findById(req.params.id);
+        let service = null;
+        if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+            service = await Service.findById(req.params.id);
+        }
+        if (!service) {
+            // Try title or normalized slug match
+            const cleaned = req.params.id.replace(/[-_]/g, ' ');
+            service = await Service.findOne({
+                title: { $regex: new RegExp(`^${cleaned}$`, 'i') }
+            });
+        }
         if (!service) {
             return res.status(404).json({ success: false, message: 'Service not found' });
         }

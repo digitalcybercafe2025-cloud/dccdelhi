@@ -9,7 +9,9 @@ const settingsSchema = new mongoose.Schema({
     slogan: { type: String, default: 'Bridging the digital divide with security and speed.' },
     footerText: { type: String, default: '© 2026 Digital Cyber Cafe Mangolpuri • Powered by SevaCore' },
     instagramUrl: { type: String, default: '' },
-    facebookUrl: { type: String, default: '' }
+    facebookUrl: { type: String, default: '' },
+    upiId: { type: String, default: '8445221632@upi' },
+    upiPayeeName: { type: String, default: 'Digital Cyber Cafe' }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Settings', settingsSchema);

@@ -32,20 +32,11 @@ export const ApplyService: React.FC = () => {
     const [collectedSpecificFields, setCollectedSpecificFields] = useState<Record<string, string>>({});
 
     useEffect(() => {
-        // First try the local constants
-        const foundLocal = SERVICES.find(s => s.id === id);
-        if (foundLocal) {
-            if (foundLocal.externalLink) {
-                window.location.href = foundLocal.externalLink;
-                return;
-            }
-            setService(foundLocal);
-            setServiceLoading(false);
-            return;
-        }
-        // Not in local constants
-        api.get(`/services/${id}`)
-            .then(res => {
+        setServiceLoading(true);
+
+        const fetchServiceData = async () => {
+            try {
+                const res = await api.get(`/services/${id}`);
                 const data = res.data.data || res.data;
                 if (data) {
                     if (data.externalLink) {
@@ -53,12 +44,25 @@ export const ApplyService: React.FC = () => {
                         return;
                     }
                     setService({ ...data, id: data._id || data.id });
-                } else {
-                    navigate('/services');
+                    return;
                 }
-            })
-            .catch(() => navigate('/services'))
-            .finally(() => setServiceLoading(false));
+            } catch (_) {
+                // Fallback to local constants if backend is offline or service is static
+            }
+
+            const foundLocal = SERVICES.find(s => s.id === id);
+            if (foundLocal) {
+                if (foundLocal.externalLink) {
+                    window.location.href = foundLocal.externalLink;
+                    return;
+                }
+                setService(foundLocal);
+            } else {
+                navigate('/services');
+            }
+        };
+
+        fetchServiceData().finally(() => setServiceLoading(false));
     }, [id, navigate]);
 
     // Called when ServiceForm completes both user details + document upload

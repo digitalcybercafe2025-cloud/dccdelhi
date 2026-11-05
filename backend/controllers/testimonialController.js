@@ -48,7 +48,14 @@ const createTestimonial = async (req, res) => {
         if (req.file) {
             imageUrl = `/uploads/testimonials/${req.file.filename}`;
         }
-        const testimonial = await Testimonial.create({ name, role, message, rating, order, image: imageUrl });
+        const testimonial = await Testimonial.create({
+            name,
+            role: role || 'Customer',
+            message,
+            rating: rating !== undefined ? Number(rating) : 5,
+            order: order !== undefined ? Number(order) : 0,
+            image: imageUrl
+        });
         res.status(201).json({ success: true, data: testimonial });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
@@ -71,9 +78,11 @@ const updateTestimonial = async (req, res) => {
         testimonial.name = name || testimonial.name;
         testimonial.role = role || testimonial.role;
         testimonial.message = message || testimonial.message;
-        testimonial.rating = rating !== undefined ? rating : testimonial.rating;
-        testimonial.order = order !== undefined ? order : testimonial.order;
-        testimonial.active = active !== undefined ? active : testimonial.active;
+        testimonial.rating = rating !== undefined ? Number(rating) : testimonial.rating;
+        testimonial.order = order !== undefined ? Number(order) : testimonial.order;
+        if (active !== undefined) {
+            testimonial.active = (active === 'true' || active === true);
+        }
         testimonial.image = imageUrl;
 
         const updated = await testimonial.save();

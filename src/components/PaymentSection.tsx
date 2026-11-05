@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
-import { Loader2, CheckCircle, Smartphone, CreditCard, Banknote, Shield, Lock } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Loader2, CheckCircle, Smartphone, CreditCard, Banknote, Shield, Lock, Copy, ExternalLink, QrCode } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
+import api from '../api/axios';
 
 interface PaymentSectionProps {
     serviceName: string;
@@ -14,22 +16,54 @@ export const PaymentSection: React.FC<PaymentSectionProps> = ({ serviceName, amo
     const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('upi');
     const [paying, setPaying] = useState(false);
     const [confirmed, setConfirmed] = useState(false);
+    const [upiId, setUpiId] = useState('8445221632@upi');
+    const [upiPayeeName, setUpiPayeeName] = useState('Digital Cyber Cafe');
+    const [utrNumber, setUtrNumber] = useState('');
+    const [copied, setCopied] = useState(false);
+
+    useEffect(() => {
+        api.get('/settings')
+            .then(res => {
+                if (res.data?.data) {
+                    if (res.data.data.upiId) setUpiId(res.data.data.upiId);
+                    if (res.data.data.upiPayeeName) setUpiPayeeName(res.data.data.upiPayeeName);
+                }
+            })
+            .catch(() => {
+                // Keep default fallback
+            });
+    }, []);
+
+    // Construct standard UPI deep-link URL (compatible with PhonePe, GPay, Paytm, BHIM, Cred)
+    const cleanServiceName = (serviceName || 'Service').replace(/[^a-zA-Z0-9 ]/g, '').trim();
+    const upiUri = `upi://pay?pa=${encodeURIComponent(upiId.trim())}&pn=${encodeURIComponent(upiPayeeName.trim())}&am=${amount}&cu=INR&tn=${encodeURIComponent(`${cleanServiceName} Fee`)}`;
+
+    const handleCopyUpi = () => {
+        navigator.clipboard.writeText(upiId);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
 
     const handlePay = async (e?: React.MouseEvent) => {
         if (e) e.preventDefault();
         setPaying(true);
-        // Simulate payment processing animation
-        await new Promise(r => setTimeout(r, 1800));
+
+        // Verification simulation animation
+        await new Promise(r => setTimeout(r, 1500));
         setConfirmed(true);
-        await new Promise(r => setTimeout(r, 800));
-        const txnId = 'TXN' + Date.now() + Math.floor(Math.random() * 9000 + 1000);
-        onPaymentComplete({ transactionId: txnId, method: paymentMethod });
+        await new Promise(r => setTimeout(r, 600));
+
+        const finalTxnId = utrNumber.trim()
+            ? utrNumber.trim()
+            : (paymentMethod === 'upi' ? 'UPI' : paymentMethod === 'cash' ? 'CSH' : 'TXN') + Date.now();
+
+        onPaymentComplete({ transactionId: finalTxnId, method: paymentMethod });
     };
 
     const METHODS: { key: PaymentMethod; icon: React.ReactNode; label: string; sub: string }[] = [
-        { key: 'upi', icon: <Smartphone className="w-5 h-5" />, label: 'UPI / QR Code', sub: 'PhonePe, GPay, Paytm' },
+        { key: 'upi', icon: <Smartphone className="w-5 h-5" />, label: 'UPI / Dynamic QR Code', sub: 'PhonePe, GPay, Paytm, BHIM' },
         { key: 'card', icon: <CreditCard className="w-5 h-5" />, label: 'Card / Net Banking', sub: 'Debit, Credit, NEFT' },
-        { key: 'cash', icon: <Banknote className="w-5 h-5" />, label: 'Cash at Counter', sub: 'Pay in person' },
+        { key: 'cash', icon: <Banknote className="w-5 h-5" />, label: 'Cash at Counter', sub: 'Pay in person at Cyber Cafe' },
     ];
 
     if (confirmed) {
@@ -57,8 +91,8 @@ export const PaymentSection: React.FC<PaymentSectionProps> = ({ serviceName, amo
                         <span className="font-bold text-slate-900 dark:text-white font-mono">₹{amount}</span>
                     </div>
                     <div className="flex justify-between items-center text-sm">
-                        <span className="text-slate-500 dark:text-slate-400 font-medium">Platform Charge</span>
-                        <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono">FREE</span>
+                        <span className="text-slate-500 dark:text-slate-400 font-medium">Gateway & Convenience Fee</span>
+                        <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono">FREE (₹0)</span>
                     </div>
                     <div className="border-t border-slate-200 dark:border-slate-700 pt-3 flex justify-between items-center">
                         <span className="text-base font-black text-slate-900 dark:text-white">Total Payable</span>
@@ -96,21 +130,73 @@ export const PaymentSection: React.FC<PaymentSectionProps> = ({ serviceName, amo
                 </div>
             </div>
 
-            {/* UPI QR Mockup */}
+            {/* Real Dynamic UPI QR Code Section */}
             {paymentMethod === 'upi' && (
-                <div className="bg-blue-50 dark:bg-blue-500/10 border border-blue-100 dark:border-blue-500/20 rounded-2xl p-5 text-center animate-in slide-in-from-top-2 duration-300">
-                    <p className="text-xs font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-3">Scan & Pay via UPI</p>
-                    {/* QR Pattern Mockup */}
-                    <div className="w-36 h-36 mx-auto rounded-xl bg-white border-2 border-blue-200 dark:border-blue-500/30 flex flex-col items-center justify-center gap-1 mb-3 shadow-inner">
-                        <div className="grid grid-cols-5 gap-0.5">
-                            {[...Array(25)].map((_, i) => (
-                                <div key={i} className={`w-3 h-3 rounded-sm ${[0, 1, 3, 5, 7, 8, 10, 14, 16, 18, 20, 22, 24].includes(i) ? 'bg-slate-900 dark:bg-slate-100' : 'bg-transparent'}`} />
-                            ))}
-                        </div>
-                        <p className="text-[8px] font-black text-slate-400 mt-1 tracking-wider">SCAN QR</p>
+                <div className="bg-gradient-to-b from-blue-50/60 to-slate-50 dark:from-blue-500/10 dark:to-slate-900/40 border border-blue-200 dark:border-blue-500/30 rounded-2xl p-6 text-center animate-in slide-in-from-top-2 duration-300">
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                        <QrCode className="w-4 h-4 text-brand dark:text-emerald-400" />
+                        <p className="text-xs font-black text-brand dark:text-emerald-400 uppercase tracking-widest">
+                            Scan to Pay ₹{amount} with any UPI App
+                        </p>
                     </div>
-                    <p className="text-sm font-black text-slate-700 dark:text-white">digitalcybercafe@upi</p>
-                    <p className="text-[11px] font-bold text-slate-400 mt-1">or click "Pay" to simulate payment</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-4">
+                        PhonePe, Google Pay, Paytm, BHIM, Cred, Amazon Pay
+                    </p>
+
+                    {/* Real Dynamic QR Code SVG */}
+                    <div className="inline-block p-4 bg-white rounded-2xl shadow-md border border-slate-200 dark:border-slate-700 mb-4 transition-transform hover:scale-102">
+                        <QRCodeSVG
+                            value={upiUri}
+                            size={180}
+                            level="M"
+                            includeMargin={false}
+                        />
+                        <div className="mt-2 text-[10px] font-black text-slate-500 tracking-wider flex items-center justify-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            DYNAMIC BARCODE • ₹{amount}
+                        </div>
+                    </div>
+
+                    {/* UPI ID display with Copy & Pay button */}
+                    <div className="flex items-center justify-center gap-2 max-w-sm mx-auto mb-4 bg-white dark:bg-slate-800 p-2 rounded-xl border border-slate-200 dark:border-slate-700">
+                        <span className="text-xs font-mono font-bold text-slate-700 dark:text-slate-200 truncate pl-2">{upiId}</span>
+                        <button
+                            type="button"
+                            onClick={handleCopyUpi}
+                            className="px-3 py-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center gap-1.5 transition-colors shrink-0"
+                        >
+                            <Copy className="w-3.5 h-3.5" />
+                            {copied ? 'Copied!' : 'Copy'}
+                        </button>
+                    </div>
+
+                    {/* Mobile Direct UPI Intent Link */}
+                    <div className="mb-5 sm:hidden">
+                        <a
+                            href={upiUri}
+                            className="inline-flex items-center justify-center gap-2 w-full py-3 px-4 rounded-xl bg-blue-600 text-white font-bold text-xs uppercase tracking-wider hover:bg-blue-700 transition-colors shadow-sm"
+                        >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                            Open Directly in UPI App (GPay / PhonePe)
+                        </a>
+                    </div>
+
+                    {/* Enter UTR Number Input */}
+                    <div className="max-w-md mx-auto text-left pt-2 border-t border-slate-200 dark:border-slate-700/60">
+                        <label className="text-[11px] font-black text-slate-700 dark:text-slate-300 uppercase tracking-wider block mb-1.5">
+                            UPI Reference / UTR Number (Optional / Recommended)
+                        </label>
+                        <input
+                            type="text"
+                            value={utrNumber}
+                            onChange={(e) => setUtrNumber(e.target.value.replace(/[^0-9a-zA-Z]/g, ''))}
+                            placeholder="Enter 12-digit UTR from PhonePe/GPay (e.g. 412356789012)"
+                            className="w-full px-4 py-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white text-sm font-mono placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-brand/30 dark:focus:ring-emerald-500/30 transition-all"
+                        />
+                        <p className="text-[10px] text-slate-400 font-medium mt-1">
+                            Payment karne ke baad apne receipt se 12-digit UTR number yahan enter karein.
+                        </p>
+                    </div>
                 </div>
             )}
 
@@ -126,12 +212,25 @@ export const PaymentSection: React.FC<PaymentSectionProps> = ({ serviceName, amo
                 </div>
             )}
 
+            {/* Card instructions */}
+            {paymentMethod === 'card' && (
+                <div className="bg-blue-50 dark:bg-blue-500/10 border border-blue-100 dark:border-blue-500/20 rounded-2xl p-5 animate-in slide-in-from-top-2 duration-300 text-left">
+                    <p className="text-xs font-black text-blue-700 dark:text-blue-400 uppercase tracking-widest mb-2">Card & Net Banking</p>
+                    <p className="text-xs text-slate-600 dark:text-slate-300 font-medium mb-3">
+                        Debit Card, Credit Card, aur Internet Banking se instant payment verification karein.
+                    </p>
+                    <div className="p-3 bg-white dark:bg-slate-800 rounded-xl border border-blue-200 dark:border-blue-500/30 text-xs font-mono text-slate-700 dark:text-slate-300">
+                        Amount Payable: ₹{amount} • 256-Bit SSL Secured
+                    </div>
+                </div>
+            )}
+
             {/* Pay Button */}
             <button
                 type="button"
                 onClick={handlePay}
                 disabled={isProcessing || paying}
-                className="w-full py-5 rounded-xl bg-brand dark:bg-emerald-600 text-white font-black text-base hover:opacity-90 transition-all shadow-xl shadow-brand/25 dark:shadow-emerald-500/25 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-3 active:scale-95"
+                className="w-full py-5 rounded-xl bg-brand dark:bg-emerald-600 text-white font-black text-base hover:opacity-90 transition-all shadow-xl shadow-brand/25 dark:shadow-emerald-500/25 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-3 active:scale-95 cursor-pointer"
             >
                 {paying ? (
                     <>
@@ -146,7 +245,7 @@ export const PaymentSection: React.FC<PaymentSectionProps> = ({ serviceName, amo
                 ) : (
                     <>
                         <Lock className="w-4 h-4" />
-                        {paymentMethod === 'cash' ? `Confirm Application` : `Pay ₹${amount} Securely`}
+                        {paymentMethod === 'cash' ? `Confirm Application (Pay ₹${amount} in Cash)` : `Confirm & Submit Application (₹${amount})`}
                     </>
                 )}
             </button>
@@ -158,7 +257,7 @@ export const PaymentSection: React.FC<PaymentSectionProps> = ({ serviceName, amo
                 </div>
                 <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                     <CheckCircle className="w-3 h-3 text-emerald-500" />
-                    Govt. Authorized
+                    Direct UPI & Bank Transfer
                 </div>
             </div>
         </div>

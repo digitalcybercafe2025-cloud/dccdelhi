@@ -164,7 +164,7 @@ const App: React.FC = () => {
           <div className="max-w-[1500px] mx-auto grid grid-cols-1 md:grid-cols-4 gap-8">
             <div className="md:col-span-2">
               <div className="flex items-center gap-3 mb-3">
-                <img src="https://upload.wikimedia.org/wikipedia/en/thumb/9/95/Digital_India_logo.svg/1200px-Digital_India_logo.svg.png" className="h-8 w-auto" alt="Digital India" />
+                <img src="/digital-india-logo.png" className="h-9 w-auto object-contain" alt="Digital India" />
                 <div className="h-6 w-[1.5px] bg-slate-200 dark:bg-white/10 mx-1" />
                 <span className="font-black text-xl tracking-tighter leading-none" style={{ color: 'var(--text-primary)' }}>Digital Cyber Cafe</span>
               </div>
@@ -204,7 +204,7 @@ const App: React.FC = () => {
           <div className="bg-white dark:bg-slate-900 rounded-[3rem] p-10 w-full max-w-md shadow-2xl border border-slate-100 dark:border-white/10 relative overflow-hidden animate-in zoom-in-95 duration-500">
             <button onClick={() => setShowLoginModal(false)} className="absolute top-8 right-8 p-2 rounded-full hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"><X className="w-5 h-5 text-slate-300" /></button>
             <div className="flex flex-col items-center mb-8 text-center">
-              <img src="https://upload.wikimedia.org/wikipedia/en/thumb/9/95/Digital_India_logo.svg/1200px-Digital_India_logo.svg.png" className="h-14 w-auto mb-4" alt="Digital India" />
+              <img src="/digital-india-logo.png" className="h-14 w-auto mb-4 object-contain" alt="Digital India" />
               <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tighter">Command Authorization</h2>
               <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mt-2">Identity Verification Gateway</p>
             </div>

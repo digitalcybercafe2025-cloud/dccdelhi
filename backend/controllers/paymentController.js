@@ -33,19 +33,30 @@ const getPayments = async (req, res) => {
             .sort({ 'paymentDetails.paymentDate': -1, createdAt: -1 })
             .skip(skip)
             .limit(parseInt(limit))
-            .select('trackingId serviceName userDetails paymentDetails createdAt');
+            .select('trackingId serviceName userDetails paymentDetails adminRemarks createdAt');
 
-        const payments = applications.map(app => ({
-            _id: app._id,
-            trackingId: app.trackingId,
-            serviceName: app.serviceName,
-            userName: app.userDetails?.fullName || 'N/A',
-            userMobile: app.userDetails?.mobile || 'N/A',
-            amount: app.paymentDetails?.amount || 0,
-            transactionId: app.paymentDetails?.transactionId || 'N/A',
-            paymentStatus: app.paymentDetails?.paymentStatus || 'Pending',
-            paymentDate: app.paymentDetails?.paymentDate || app.createdAt
-        }));
+        const payments = applications.map(app => {
+            const status = app.paymentDetails?.paymentStatus || 'Pending';
+            const date = app.paymentDetails?.paymentDate || app.createdAt;
+            return {
+                _id: app._id,
+                applicationId: app.trackingId || app._id,
+                trackingId: app.trackingId,
+                serviceName: app.serviceName,
+                userName: app.userDetails?.fullName || 'N/A',
+                userMobile: app.userDetails?.mobile || 'N/A',
+                userEmail: app.userDetails?.email || '',
+                userAddress: [app.userDetails?.city, app.userDetails?.state].filter(Boolean).join(', ') || 'N/A',
+                amount: app.paymentDetails?.amount || 0,
+                method: app.paymentDetails?.method || 'upi',
+                transactionId: app.paymentDetails?.transactionId || 'N/A',
+                status: status,
+                paymentStatus: status,
+                adminRemarks: app.adminRemarks || app.paymentDetails?.adminRemark || '',
+                createdAt: date,
+                paymentDate: date
+            };
+        });
 
         res.json({
             success: true,
@@ -143,4 +154,45 @@ const getStats = async (req, res) => {
     }
 };
 
-module.exports = { getPayments, exportPayments, getStats };
+// @desc  Update payment status (Verify / Reject with remarks)
+// @route PATCH /api/payments/:id/status
+const updatePaymentStatus = async (req, res) => {
+    try {
+        const { status, adminRemarks } = req.body;
+        const normalizedStatus = ['Paid', 'Pending', 'Failed'].includes(status) ? status : (status === 'Paid' ? 'Paid' : 'Pending');
+
+        let app = await Application.findById(req.params.id);
+        if (!app) {
+            return res.status(404).json({ success: false, message: 'Application/Payment not found' });
+        }
+
+        if (!app.paymentDetails) {
+            app.paymentDetails = {};
+        }
+
+        app.paymentDetails.paymentStatus = normalizedStatus;
+        if (adminRemarks !== undefined) {
+            app.paymentDetails.adminRemark = adminRemarks;
+            app.adminRemarks = adminRemarks;
+        }
+        if (normalizedStatus === 'Paid' && !app.paymentDetails.paymentDate) {
+            app.paymentDetails.paymentDate = new Date();
+        }
+        await app.save();
+
+        res.json({
+            success: true,
+            message: `Payment status updated to ${normalizedStatus}`,
+            data: {
+                _id: app._id,
+                status: app.paymentDetails.paymentStatus,
+                paymentStatus: app.paymentDetails.paymentStatus,
+                adminRemarks: app.adminRemarks
+            }
+        });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+module.exports = { getPayments, exportPayments, getStats, updatePaymentStatus };

@@ -18,7 +18,7 @@ const getSettings = async (req, res) => {
 // @route PUT /api/settings
 const updateSettings = async (req, res) => {
     try {
-        const { siteName, contactNumber, whatsapp, email, address, slogan, footerText, instagramUrl, facebookUrl } = req.body;
+        const { siteName, contactNumber, whatsapp, email, address, slogan, footerText, instagramUrl, facebookUrl, upiId, upiPayeeName } = req.body;
         let settings = await Settings.findOne();
         if (!settings) settings = new Settings();
 
@@ -31,6 +31,8 @@ const updateSettings = async (req, res) => {
         if (footerText !== undefined) settings.footerText = footerText;
         if (instagramUrl !== undefined) settings.instagramUrl = instagramUrl;
         if (facebookUrl !== undefined) settings.facebookUrl = facebookUrl;
+        if (upiId !== undefined) settings.upiId = upiId;
+        if (upiPayeeName !== undefined) settings.upiPayeeName = upiPayeeName;
 
         await settings.save();
         res.json({ success: true, data: settings });

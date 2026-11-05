@@ -1,0 +1,19 @@
+{
+  "restartable": "rs",
+  "ignore": [
+    ".git",
+    "node_modules/**/node_modules",
+    "uploads/**"
+  ],
+  "delay": "1000",
+  "watch": [
+    "controllers",
+    "models",
+    "routes",
+    "middleware",
+    "utils",
+    "server.js"
+  ],
+  "ext": "js,json"
+}
+

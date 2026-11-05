@@ -214,7 +214,7 @@ export const AdminDashboard: React.FC = () => {
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-xl animate-in fade-in duration-700">
                 <div className="bg-white dark:bg-slate-900 rounded-[3rem] p-10 w-full max-w-md shadow-2xl border border-slate-100 dark:border-white/10 relative overflow-hidden animate-in zoom-in-95 duration-500">
                     <div className="flex flex-col items-center mb-8 text-center">
-                        <img src="https://upload.wikimedia.org/wikipedia/en/thumb/9/95/Digital_India_logo.svg/1200px-Digital_India_logo.svg.png" className="h-14 w-auto mb-4" alt="Digital India" />
+                        <img src="/digital-india-logo.png" className="h-14 w-auto mb-4 object-contain" alt="Digital India" />
                         <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tighter">Command Authorization</h2>
                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mt-2">Identity Verification Gateway</p>
                     </div>

@@ -7,7 +7,8 @@ const inputCls = 'w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-20
 const SettingsManager: React.FC = () => {
     const [form, setForm] = useState({
         siteName: '', contactNumber: '', whatsapp: '', email: '',
-        address: '', slogan: '', footerText: '', instagramUrl: '', facebookUrl: ''
+        address: '', slogan: '', footerText: '', instagramUrl: '', facebookUrl: '',
+        upiId: '8445221632@upi', upiPayeeName: 'Digital Cyber Cafe'
     });
     const [profileForm, setProfileForm] = useState({
         name: '', email: '', currentPassword: '', newPassword: '', avatar: ''
@@ -211,6 +212,24 @@ const SettingsManager: React.FC = () => {
                         </div>
                         <Field label="Support Email" field="email" type="email" />
                         <Field label="Physical HQ Address" field="address" />
+                    </div>
+
+                    {/* UPI & Payment Settings */}
+                    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-8 space-y-6 border-b-4 border-b-purple-500/10">
+                        <div className="flex items-center gap-3 pb-2">
+                            <span className="w-1.5 h-5 bg-purple-600 rounded-full" />
+                            <div>
+                                <h3 className="font-black text-slate-800 text-base uppercase tracking-tight">Direct UPI Payment Gateway</h3>
+                                <p className="text-[11px] font-bold text-slate-400">0% Commission, Direct Bank Account QR Code Settings</p>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <Field label="Business UPI ID (VPA)" field="upiId" placeholder="e.g. 8445221632@upi" />
+                            <Field label="Payee Merchant Name" field="upiPayeeName" placeholder="Digital Cyber Cafe" />
+                        </div>
+                        <div className="p-4 rounded-2xl bg-purple-50 border border-purple-100 text-purple-900 text-xs font-medium">
+                            💡 Customers scanning the QR code or clicking "Pay via UPI" will automatically pay the exact dynamic service fee directly to this UPI ID without any gateway charges.
+                        </div>
                     </div>
 
                     {/* Socials */}

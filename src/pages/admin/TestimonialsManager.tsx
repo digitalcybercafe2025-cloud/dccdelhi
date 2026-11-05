@@ -46,16 +46,26 @@ const TestimonialsManager: React.FC = () => {
         e.preventDefault(); setSaving(true);
         try {
             const fd = new FormData();
-            fd.append('name', form.name); fd.append('role', form.role);
-            fd.append('message', form.message); fd.append('rating', String(form.rating));
+            fd.append('name', form.name);
+            fd.append('role', form.role);
+            fd.append('message', form.message);
+            fd.append('rating', String(form.rating));
             fd.append('order', String(form.order));
-            if (form.imageFile) fd.append('image', form.imageFile);
-            else fd.append('image', form.image);
+            if (form.imageFile) {
+                fd.append('image', form.imageFile);
+            } else if (form.image) {
+                fd.append('image', form.image);
+            }
             const config = { headers: { 'Content-Type': 'multipart/form-data' } };
             if (editing) await api.put(`/testimonials/${editing._id}`, fd, config);
             else await api.post('/testimonials', fd, config);
-            setShowModal(false); fetchAll();
-        } catch { alert('Failed to save'); }
+            setShowModal(false);
+            fetchAll();
+        } catch (err: any) {
+            console.error('Failed to save testimonial', err);
+            const msg = err?.response?.data?.message || err?.message || 'Failed to save';
+            alert(`Failed to save: ${msg}`);
+        }
         finally { setSaving(false); }
     };
 
