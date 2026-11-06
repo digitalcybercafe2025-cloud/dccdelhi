@@ -111,26 +111,34 @@ export const Hero: React.FC<HeroProps> = ({ messages = [], slides = [] }) => {
                     alt={slide.title}
                     className="w-full h-full object-contain brightness-[1.02]"
                   />
-                  {/* Ultra-smooth multi-stop light overlay for better text blending */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-white via-white/60 via-white/10 to-transparent dark:from-slate-950 dark:via-slate-900/60 dark:to-transparent flex items-end p-5 md:p-10 lg:p-12">
-                    <div className="text-slate-900 dark:text-white max-w-2xl animate-in slide-in-from-bottom-8 duration-1000">
-                      <div className="flex items-center gap-4 mb-3 md:mb-5 bg-brand/5 dark:bg-white/10 backdrop-blur-3xl w-fit px-4 py-2 rounded-2xl border border-brand/10 dark:border-white/10 shadow-sm">
-                        <ShieldCheck className="w-3.5 md:w-4 h-3.5 md:h-4 text-brand dark:text-emerald-400 verified-badge-glow" />
-                        <span className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] md:tracking-[0.3em] text-brand dark:text-white">{slide.badge || 'Official Gateway'}</span>
+                  {/* Multi-stop light overlay for better text blending - only rendered if title, subtitle, or button is present */}
+                  {(Boolean(slide.title?.trim() || slide.subtitle?.trim() || slide.buttonText?.trim())) && (
+                    <div className="absolute inset-0 bg-gradient-to-t from-white via-white/60 via-white/10 to-transparent dark:from-slate-950 dark:via-slate-900/60 dark:to-transparent flex items-end p-5 md:p-10 lg:p-12 pointer-events-none">
+                      <div className="text-slate-900 dark:text-white max-w-2xl animate-in slide-in-from-bottom-8 duration-1000 pointer-events-auto">
+                        {Boolean(slide.badge?.trim()) && (
+                          <div className="flex items-center gap-4 mb-3 md:mb-5 bg-brand/5 dark:bg-white/10 backdrop-blur-3xl w-fit px-4 py-2 rounded-2xl border border-brand/10 dark:border-white/10 shadow-sm">
+                            <ShieldCheck className="w-3.5 md:w-4 h-3.5 md:h-4 text-brand dark:text-emerald-400 verified-badge-glow" />
+                            <span className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] md:tracking-[0.3em] text-brand dark:text-white">{slide.badge}</span>
+                          </div>
+                        )}
+                        {Boolean(slide.title?.trim()) && (
+                          <h2 className="text-3xl md:text-4xl lg:text-5xl font-black mb-3 md:mb-4 tracking-tighter leading-[1.1] md:leading-[1] text-brand dark:text-white">
+                            {renderHighlightedText(slide.title)}
+                          </h2>
+                        )}
+                        {Boolean(slide.subtitle?.trim()) && (
+                          <p className="text-slate-600 dark:text-slate-300 text-xs md:text-sm lg:text-base font-bold leading-relaxed opacity-90 max-w-lg">
+                            {slide.subtitle}
+                          </p>
+                        )}
+                        {Boolean(slide.buttonText?.trim()) && (
+                          <a href={slide.buttonLink || '#'} className="mt-5 inline-flex items-center gap-2 px-6 py-3 bg-brand text-white rounded-xl font-black text-xs hover:opacity-90 transition-all">
+                            {slide.buttonText} <ChevronRight size={14} />
+                          </a>
+                        )}
                       </div>
-                      <h2 className="text-3xl md:text-4xl lg:text-5xl font-black mb-3 md:mb-4 tracking-tighter leading-[1.1] md:leading-[1] text-brand dark:text-white">
-                        {renderHighlightedText(slide.title)}
-                      </h2>
-                      <p className="text-slate-600 dark:text-slate-300 text-xs md:text-sm lg:text-base font-bold leading-relaxed opacity-90 max-w-lg">
-                        {slide.subtitle}
-                      </p>
-                      {slide.buttonText && (
-                        <a href={slide.buttonLink || '#'} className="mt-5 inline-flex items-center gap-2 px-6 py-3 bg-brand text-white rounded-xl font-black text-xs hover:opacity-90 transition-all">
-                          {slide.buttonText} <ChevronRight size={14} />
-                        </a>
-                      )}
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
             ))}

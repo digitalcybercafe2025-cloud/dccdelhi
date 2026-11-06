@@ -25,8 +25,8 @@ const getActiveSlides = async (req, res) => {
 
 const createSlide = async (req, res) => {
     try {
-        const { title, subtitle, badge, buttonText, buttonLink, order, imageBase64 } = req.body;
-        let slideImage = imageBase64 || req.body.image;
+        const { title, subtitle, badge, buttonText, buttonLink, order, imageBase64, image: imageUrl } = req.body;
+        let slideImage = imageBase64 || imageUrl || req.body.image;
 
         if (!slideImage && req.file) {
             try {
@@ -37,14 +37,14 @@ const createSlide = async (req, res) => {
             }
         }
 
-        if (!slideImage) return res.status(400).json({ success: false, message: 'Image is required' });
+        if (!slideImage) return res.status(400).json({ success: false, message: 'Image or Image URL is required' });
 
         const slide = await HeroSlide.create({
-            title,
-            subtitle,
-            badge,
-            buttonText,
-            buttonLink,
+            title: title || '',
+            subtitle: subtitle || '',
+            badge: badge || '',
+            buttonText: buttonText || '',
+            buttonLink: buttonLink || '',
             order: order !== undefined ? Number(order) : 0,
             image: slideImage
         });
@@ -57,11 +57,11 @@ const createSlide = async (req, res) => {
 
 const updateSlide = async (req, res) => {
     try {
-        const { title, subtitle, badge, buttonText, buttonLink, order, active, imageBase64 } = req.body;
+        const { title, subtitle, badge, buttonText, buttonLink, order, active, imageBase64, image: imageUrl } = req.body;
         const slide = await HeroSlide.findById(req.params.id);
         if (!slide) return res.status(404).json({ success: false, message: 'Slide not found' });
 
-        if (title) slide.title = title;
+        if (title !== undefined) slide.title = title;
         if (subtitle !== undefined) slide.subtitle = subtitle;
         if (badge !== undefined) slide.badge = badge;
         if (buttonText !== undefined) slide.buttonText = buttonText;
@@ -69,17 +69,20 @@ const updateSlide = async (req, res) => {
         if (order !== undefined) slide.order = Number(order);
         if (active !== undefined) slide.active = active;
 
-        if (imageBase64) {
-            slide.image = imageBase64;
-        } else if (req.file) {
+        let slideImage = imageBase64 || imageUrl;
+        if (!slideImage && req.file) {
             try {
                 const fileData = fs.readFileSync(req.file.path);
-                slide.image = `data:${req.file.mimetype || 'image/jpeg'};base64,${fileData.toString('base64')}`;
+                slideImage = `data:${req.file.mimetype || 'image/jpeg'};base64,${fileData.toString('base64')}`;
             } catch (err) {
-                slide.image = `/uploads/hero/${req.file.filename}`;
+                slideImage = `/uploads/hero/${req.file.filename}`;
             }
-        } else if (req.body.image) {
-            slide.image = req.body.image;
+        } else if (!slideImage && req.body.image) {
+            slideImage = req.body.image;
+        }
+
+        if (slideImage) {
+            slide.image = slideImage;
         }
 
         const updated = await slide.save();
