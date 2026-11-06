@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Edit3, Image as ImageIcon, Save, X, MoveUp, MoveDown, Check, AlertCircle, Loader2 } from 'lucide-react';
-import api from '../../api/axios';
+import api, { getMediaUrl } from '../../api/axios';
 
 interface Slide {
     _id: string;
@@ -37,7 +37,7 @@ const HeroCarouselManager: React.FC<Props> = ({ viewMode = 'grid' }) => {
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
 
-    const API_BASE = 'http://localhost:5000'; // Fallback to localhost
+
 
     useEffect(() => {
         fetchSlides();
@@ -77,7 +77,20 @@ const HeroCarouselManager: React.FC<Props> = ({ viewMode = 'grid' }) => {
                 data.append(key, formData[key]);
             }
         });
-        if (imageFile) data.append('image', imageFile);
+        if (imageFile) {
+            data.append('image', imageFile);
+            try {
+                const base64: string = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result as string);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(imageFile);
+                });
+                data.append('imageBase64', base64);
+            } catch (err) {
+                console.error('Base64 conversion error', err);
+            }
+        }
 
         try {
             let res;
@@ -117,7 +130,7 @@ const HeroCarouselManager: React.FC<Props> = ({ viewMode = 'grid' }) => {
     const openEdit = (slide: Slide) => {
         setEditingSlide(slide);
         setFormData({ ...slide });
-        const imgUrl = slide.image.startsWith('http') ? slide.image : `${API_BASE}${slide.image}`;
+        const imgUrl = getMediaUrl(slide.image);
         setImagePreview(imgUrl);
         setIsModalOpen(true);
         setError(null);
@@ -183,7 +196,7 @@ const HeroCarouselManager: React.FC<Props> = ({ viewMode = 'grid' }) => {
                         <div key={slide._id} className="bg-white rounded-[2rem] p-5 shadow-sm border border-slate-100 group hover:shadow-xl transition-all">
                             <div className="relative aspect-video rounded-2xl overflow-hidden mb-4 bg-slate-100">
                                 <img
-                                    src={slide.image.startsWith('http') ? slide.image : `${API_BASE}${slide.image}`}
+                                    src={getMediaUrl(slide.image)}
                                     alt={slide.title}
                                     className="w-full h-full object-cover"
                                     onError={(e) => (e.currentTarget.src = 'https://via.placeholder.com/800x450?text=Image+Load+Error')}
@@ -234,7 +247,7 @@ const HeroCarouselManager: React.FC<Props> = ({ viewMode = 'grid' }) => {
                                         <td className="p-4 pl-6 w-32">
                                             <div className="aspect-video rounded-xl overflow-hidden bg-slate-100 w-24">
                                                 <img
-                                                    src={slide.image.startsWith('http') ? slide.image : `${API_BASE}${slide.image}`}
+                                                    src={getMediaUrl(slide.image)}
                                                     alt={slide.title}
                                                     className="w-full h-full object-cover"
                                                     onError={(e) => (e.currentTarget.src = 'https://via.placeholder.com/800x450?text=Error')}

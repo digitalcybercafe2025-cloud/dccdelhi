@@ -25,8 +25,19 @@ const getActiveSlides = async (req, res) => {
 
 const createSlide = async (req, res) => {
     try {
-        const { title, subtitle, badge, buttonText, buttonLink, order } = req.body;
-        if (!req.file) return res.status(400).json({ success: false, message: 'Image is required' });
+        const { title, subtitle, badge, buttonText, buttonLink, order, imageBase64 } = req.body;
+        let slideImage = imageBase64 || req.body.image;
+
+        if (!slideImage && req.file) {
+            try {
+                const fileData = fs.readFileSync(req.file.path);
+                slideImage = `data:${req.file.mimetype || 'image/jpeg'};base64,${fileData.toString('base64')}`;
+            } catch (err) {
+                slideImage = `/uploads/hero/${req.file.filename}`;
+            }
+        }
+
+        if (!slideImage) return res.status(400).json({ success: false, message: 'Image is required' });
 
         const slide = await HeroSlide.create({
             title,
@@ -34,8 +45,8 @@ const createSlide = async (req, res) => {
             badge,
             buttonText,
             buttonLink,
-            order: order || 0,
-            image: `/uploads/hero/${req.file.filename}`
+            order: order !== undefined ? Number(order) : 0,
+            image: slideImage
         });
 
         res.status(201).json({ success: true, data: slide });
@@ -46,7 +57,7 @@ const createSlide = async (req, res) => {
 
 const updateSlide = async (req, res) => {
     try {
-        const { title, subtitle, badge, buttonText, buttonLink, order, active } = req.body;
+        const { title, subtitle, badge, buttonText, buttonLink, order, active, imageBase64 } = req.body;
         const slide = await HeroSlide.findById(req.params.id);
         if (!slide) return res.status(404).json({ success: false, message: 'Slide not found' });
 
@@ -55,14 +66,20 @@ const updateSlide = async (req, res) => {
         if (badge !== undefined) slide.badge = badge;
         if (buttonText !== undefined) slide.buttonText = buttonText;
         if (buttonLink !== undefined) slide.buttonLink = buttonLink;
-        if (order !== undefined) slide.order = order;
+        if (order !== undefined) slide.order = Number(order);
         if (active !== undefined) slide.active = active;
 
-        if (req.file) {
-            // Delete old image if exists
-            const oldPath = path.join(__dirname, '..', slide.image);
-            if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-            slide.image = `/uploads/hero/${req.file.filename}`;
+        if (imageBase64) {
+            slide.image = imageBase64;
+        } else if (req.file) {
+            try {
+                const fileData = fs.readFileSync(req.file.path);
+                slide.image = `data:${req.file.mimetype || 'image/jpeg'};base64,${fileData.toString('base64')}`;
+            } catch (err) {
+                slide.image = `/uploads/hero/${req.file.filename}`;
+            }
+        } else if (req.body.image) {
+            slide.image = req.body.image;
         }
 
         const updated = await slide.save();
@@ -77,8 +94,12 @@ const deleteSlide = async (req, res) => {
         const slide = await HeroSlide.findById(req.params.id);
         if (!slide) return res.status(404).json({ success: false, message: 'Slide not found' });
 
-        const imagePath = path.join(__dirname, '..', slide.image);
-        if (fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
+        if (slide.image && slide.image.startsWith('/uploads/')) {
+            const imagePath = path.join(__dirname, '..', slide.image);
+            if (fs.existsSync(imagePath)) {
+                try { fs.unlinkSync(imagePath); } catch (e) {}
+            }
+        }
 
         await slide.deleteOne();
         res.json({ success: true, message: 'Slide deleted' });

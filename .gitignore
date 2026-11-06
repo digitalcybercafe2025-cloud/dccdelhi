@@ -20,7 +20,9 @@ dist-ssr
 # Backend
 backend/node_modules
 backend/.env
-backend/uploads
+backend/uploads/*
+!backend/uploads/hero/
+!backend/uploads/testimonials/
 backend/backend
 
 # Editor directories and files

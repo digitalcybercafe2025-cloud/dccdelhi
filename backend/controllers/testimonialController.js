@@ -43,10 +43,15 @@ const getAllTestimonials = async (req, res) => {
 // @route POST /api/testimonials
 const createTestimonial = async (req, res) => {
     try {
-        const { name, role, message, rating, order, image } = req.body;
-        let imageUrl = image || '';
+        const { name, role, message, rating, order, image, imageBase64 } = req.body;
+        let imageUrl = imageBase64 || image || '';
         if (req.file) {
-            imageUrl = `/uploads/testimonials/${req.file.filename}`;
+            try {
+                const fileData = fs.readFileSync(req.file.path);
+                imageUrl = `data:${req.file.mimetype || 'image/jpeg'};base64,${fileData.toString('base64')}`;
+            } catch (e) {
+                imageUrl = `/uploads/testimonials/${req.file.filename}`;
+            }
         }
         const testimonial = await Testimonial.create({
             name,
@@ -66,13 +71,18 @@ const createTestimonial = async (req, res) => {
 // @route PUT /api/testimonials/:id
 const updateTestimonial = async (req, res) => {
     try {
-        const { name, role, message, rating, order, active, image } = req.body;
+        const { name, role, message, rating, order, active, image, imageBase64 } = req.body;
         const testimonial = await Testimonial.findById(req.params.id);
         if (!testimonial) return res.status(404).json({ success: false, message: 'Not found' });
 
-        let imageUrl = image !== undefined ? image : testimonial.image;
+        let imageUrl = imageBase64 || (image !== undefined ? image : testimonial.image);
         if (req.file) {
-            imageUrl = `/uploads/testimonials/${req.file.filename}`;
+            try {
+                const fileData = fs.readFileSync(req.file.path);
+                imageUrl = `data:${req.file.mimetype || 'image/jpeg'};base64,${fileData.toString('base64')}`;
+            } catch (e) {
+                imageUrl = `/uploads/testimonials/${req.file.filename}`;
+            }
         }
 
         testimonial.name = name || testimonial.name;
@@ -110,12 +120,21 @@ const toggleActive = async (req, res) => {
 // @route DELETE /api/testimonials/:id
 const deleteTestimonial = async (req, res) => {
     try {
-        const testimonial = await Testimonial.findByIdAndDelete(req.params.id);
+        const testimonial = await Testimonial.findById(req.params.id);
         if (!testimonial) return res.status(404).json({ success: false, message: 'Not found' });
-        res.json({ success: true, message: 'Deleted' });
+        await testimonial.deleteOne();
+        res.json({ success: true, message: 'Testimonial deleted' });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
 };
 
-module.exports = { getTestimonials, getAllTestimonials, createTestimonial, updateTestimonial, toggleActive, deleteTestimonial, upload };
+module.exports = {
+    getTestimonials,
+    getAllTestimonials,
+    createTestimonial,
+    updateTestimonial,
+    toggleActive,
+    deleteTestimonial,
+    upload
+};

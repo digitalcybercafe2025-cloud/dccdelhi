@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../api/axios';
+import api, { getMediaUrl } from '../api/axios';
 import { Service } from '../../types';
 import { Loader2, LogOut, Search, Eye, Check, X, FileText, ChevronDown, Phone, Mail, Plus, Trash2, Edit, LayoutGrid, List } from 'lucide-react';
 
@@ -561,7 +561,7 @@ export const AdminDashboard: React.FC = () => {
                                         {reviewApp.documents.map((doc, idx) => (
                                             <div key={idx} className="flex justify-between items-center bg-white dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-white/5">
                                                 <span className="text-sm font-bold flex items-center gap-2"><FileText className="w-4 h-4 text-slate-400" /> {doc.encodedName || `Document ${idx + 1}`}</span>
-                                                <a href={`http://localhost:5000/${doc.filePath.replace(/\\/g, '/')}`} target="_blank" rel="noreferrer" className="text-xs font-black text-brand dark:text-emerald-500 uppercase tracking-wider hover:underline">View</a>
+                                                <a href={getMediaUrl(doc.filePath.replace(/\\/g, '/'))} target="_blank" rel="noreferrer" className="text-xs font-black text-brand dark:text-emerald-500 uppercase tracking-wider hover:underline">View</a>
                                             </div>
                                         ))}
                                         {reviewApp.documents.length === 0 && <p className="text-sm text-slate-500 italic">No documents attached.</p>}

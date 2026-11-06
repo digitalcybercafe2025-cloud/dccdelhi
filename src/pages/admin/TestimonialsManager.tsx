@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import api from '../../api/axios';
+import api, { getMediaUrl } from '../../api/axios';
 
 const labelCls = 'text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5';
 const modalInputCls = 'w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 text-sm font-bold outline-none focus:border-blue-400 transition-colors';
@@ -38,7 +38,7 @@ const TestimonialsManager: React.FC = () => {
     const openEdit = (t: any) => {
         setEditing(t);
         setForm({ name: t.name, role: t.role || 'Customer', message: t.message, image: t.image || '', rating: t.rating || 5, order: t.order || 0, imageFile: null });
-        setImagePreview(t.image ? (t.image.startsWith('/') ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${t.image}` : t.image) : null);
+        setImagePreview(t.image ? getMediaUrl(t.image) : null);
         setShowModal(true);
     };
 
@@ -113,7 +113,7 @@ const TestimonialsManager: React.FC = () => {
                                 <div className="relative mb-3">
                                     {t.image ? (
                                         <img
-                                            src={t.image.startsWith('/') ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${t.image}` : t.image}
+                                            src={getMediaUrl(t.image)}
                                             alt={t.name}
                                             className="w-16 h-16 rounded-3xl object-cover ring-4 ring-slate-50 group-hover:ring-blue-50 transition-all"
                                             onError={e => (e.currentTarget.src = `https://ui-avatars.com/api/?name=${t.name}&background=eff6ff&color=2563eb`)}

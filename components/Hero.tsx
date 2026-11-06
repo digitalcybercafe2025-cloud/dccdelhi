@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { CAROUSEL_IMAGES } from '../constants';
 import { Message } from '../types';
 import { ChevronRight, BellRing, Sparkles, ShieldCheck, Zap, AlertTriangle, Briefcase, Megaphone, CreditCard, Info, Clock, X } from 'lucide-react';
+import { getMediaUrl } from '../src/api/axios';
 
 interface HeroProps {
   messages?: any[];
@@ -106,7 +107,7 @@ export const Hero: React.FC<HeroProps> = ({ messages = [], slides = [] }) => {
               >
                 <div className="w-full h-full relative rounded-[2rem] md:rounded-[44px] overflow-hidden bg-slate-100/50 dark:bg-slate-900/50">
                   <img
-                    src={slide.image.startsWith('/') ? `${window.location.protocol}//${window.location.hostname}:5000${slide.image}` : slide.image}
+                    src={getMediaUrl(slide.image)}
                     alt={slide.title}
                     className="w-full h-full object-contain brightness-[1.02]"
                   />

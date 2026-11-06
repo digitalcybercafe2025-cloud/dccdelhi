@@ -12,7 +12,7 @@ const { protect, isAdmin } = require('../middleware/authMiddleware');
 // Multer config for Hero slides
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        const dir = 'uploads/hero';
+        const dir = path.join(__dirname, '../uploads/hero');
         if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
         cb(null, dir);
     },
@@ -20,7 +20,7 @@ const storage = multer.diskStorage({
         cb(null, `hero-${Date.now()}${path.extname(file.originalname)}`);
     }
 });
-const upload = multer({ storage });
+const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
 
 // Public routes
 router.get('/slides/active', getActiveSlides);

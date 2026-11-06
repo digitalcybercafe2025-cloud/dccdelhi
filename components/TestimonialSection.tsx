@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Testimonial } from '../types';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Autoplay, Navigation, Pagination } from 'swiper/modules';
+import { getMediaUrl } from '../src/api/axios';
 
 interface TestimonialSectionProps {
   testimonials: Testimonial[];
@@ -184,10 +185,8 @@ export const TestimonialSection: React.FC<TestimonialSectionProps> = ({ testimon
                     <img
                       src={
                         (testimonial as any).photo_url || (testimonial as any).image || (testimonial as any).photo
-                          ? ((testimonial as any).photo_url || (testimonial as any).image || (testimonial as any).photo).startsWith('/uploads')
-                            ? `${window.location.protocol}//${window.location.hostname}:5000${(testimonial as any).photo_url || (testimonial as any).image || (testimonial as any).photo}`
-                            : (testimonial as any).photo_url || (testimonial as any).image || (testimonial as any).photo
-                          : `https://ui-avatars.com/api/?name=${testimonial.name}`
+                          ? getMediaUrl((testimonial as any).photo_url || (testimonial as any).image || (testimonial as any).photo)
+                          : `https://ui-avatars.com/api/?name=${encodeURIComponent(testimonial.name)}`
                       }
                       alt={testimonial.name}
                       loading="lazy"
