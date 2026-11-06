@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
-import { Search, Loader2, FileText, CheckCircle, Clock, Copy, XCircle, AlertTriangle, RefreshCw, Hash, Download } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Search, Loader2, FileText, CheckCircle, Clock, Copy, XCircle, AlertTriangle, RefreshCw, Hash, Download, Image as ImageIcon } from 'lucide-react';
 import api from '../api/axios';
 import { generateReceipt } from '../utils/pdfGenerator';
+import { AcknowledgementReceipt } from '../components/AcknowledgementReceipt';
+import { toJpeg } from 'html-to-image';
 
 interface Application {
     trackingId: string;
@@ -39,10 +41,12 @@ const getStatusStep = (status: string): number => {
 
 export const TrackApplication: React.FC = () => {
     const [trackingId, setTrackingId] = useState('');
-    const [application, setApplication] = useState<Application | null>(null);
+    const [application, setApplication] = useState<any | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [copied, setCopied] = useState(false);
+    const [downloadingJpeg, setDownloadingJpeg] = useState(false);
+    const receiptRef = useRef<HTMLDivElement>(null);
 
     const handleTrack = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -62,6 +66,27 @@ export const TrackApplication: React.FC = () => {
             setError(msg || 'No application found with this ID. Please check and try again.');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleDownloadJpeg = async () => {
+        if (!receiptRef.current) return;
+        try {
+            setDownloadingJpeg(true);
+            const dataUrl = await toJpeg(receiptRef.current, {
+                quality: 0.95,
+                pixelRatio: 2,
+                backgroundColor: '#ffffff'
+            });
+            const link = document.createElement('a');
+            link.download = `Receipt-${application?.trackingId || 'Application'}.jpg`;
+            link.href = dataUrl;
+            link.click();
+        } catch (err) {
+            console.error('Failed to generate receipt image:', err);
+            alert('Could not download image. Please use Download PDF instead.');
+        } finally {
+            setDownloadingJpeg(false);
         }
     };
 
@@ -286,18 +311,35 @@ export const TrackApplication: React.FC = () => {
                                 </div>
                             )}
 
-                            {/* ─── Last Updated ─── */}
-                            <div className="flex flex-col gap-4">
-                                <button
-                                    onClick={() => generateReceipt(application)}
-                                    className="w-full py-4 bg-brand/10 dark:bg-emerald-500/10 text-brand dark:text-emerald-400 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-brand/20 dark:hover:bg-emerald-500/20 transition-all flex items-center justify-center gap-2 border border-brand/20 dark:border-emerald-500/20"
-                                >
-                                    <Download className="w-4 h-4" /> Download Acknowledgement Receipt
-                                </button>
+                            {/* ─── Receipt Downloads (PDF + JPEG) ─── */}
+                            <div className="flex flex-col gap-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => generateReceipt(application)}
+                                        className="py-3.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer"
+                                    >
+                                        <Download className="w-4 h-4" /> Download PDF Receipt
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleDownloadJpeg}
+                                        disabled={downloadingJpeg}
+                                        className="py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer disabled:opacity-50"
+                                    >
+                                        {downloadingJpeg ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
+                                        {downloadingJpeg ? 'Generating...' : 'Download JPEG Slip'}
+                                    </button>
+                                </div>
 
-                                <p className="text-center text-[10px] text-slate-300 dark:text-slate-600 font-bold uppercase tracking-widest">
+                                <p className="text-center text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
                                     Last Updated: {new Date(application.updatedAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                 </p>
+
+                                {/* Offscreen or Visible Receipt Element for JPEG Generation */}
+                                <div className="mt-4 overflow-x-auto">
+                                    <AcknowledgementReceipt ref={receiptRef} application={application} />
+                                </div>
                             </div>
                         </div>
                     </div>

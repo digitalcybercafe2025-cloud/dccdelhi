@@ -21,6 +21,18 @@ const serviceSchema = new mongoose.Schema({
     requiredDocs: [{
         type: String
     }],
+    mandatoryDocs: [{
+        type: String
+    }],
+    idProofs: [{
+        type: String
+    }],
+    addressProofs: [{
+        type: String
+    }],
+    otherDocs: [{
+        type: String
+    }],
     category: {
         type: String,
         required: true,

@@ -56,6 +56,20 @@ const createApplication = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Payment details are required. Complete payment before submitting.' });
         }
 
+        // Duplicate UTR check (prevent fraud / duplicate usage of same payment reference)
+        if (parsedPaymentDetails.transactionId && parsedPaymentDetails.method === 'upi') {
+            const cleanUtr = parsedPaymentDetails.transactionId.trim();
+            const existingWithSameUtr = await Application.findOne({
+                'paymentDetails.transactionId': cleanUtr
+            });
+            if (existingWithSameUtr) {
+                return res.status(400).json({
+                    success: false,
+                    message: `This UPI UTR number (${cleanUtr}) has already been submitted for Application #${existingWithSameUtr.trackingId}. Please verify your transaction reference.`
+                });
+            }
+        }
+
         const parsedSpecificFields = safeJsonParse(serviceSpecificFields) || {};
 
         // Generate Tracking ID: SVC-YYYY-RANDOM6
@@ -66,9 +80,10 @@ const createApplication = async (req, res) => {
 
         // Map uploaded files to document records
         let documents = [];
+        const parsedDocTypes = safeJsonParse(req.body.documentTypes) || [];
         if (req.files && req.files.length > 0) {
-            documents = req.files.map(file => ({
-                docType: file.fieldname,
+            documents = req.files.map((file, idx) => ({
+                docType: parsedDocTypes[idx] || file.fieldname,
                 fileName: file.filename,
                 filePath: `uploads/${file.filename}`,
                 originalName: file.originalname,

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import api from '../../api/axios';
+import api, { getMediaUrl } from '../../api/axios';
 
 // ── Design tokens matching Dashboard ─────────────────────────────────────────
 const inputCls = 'px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 placeholder:text-slate-400 text-sm font-bold outline-none focus:border-blue-400 transition-colors';
@@ -7,7 +7,22 @@ const labelCls = 'text-[10px] font-black text-slate-400 uppercase tracking-wides
 const modalInputCls = 'w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 text-sm font-bold outline-none focus:border-blue-400 transition-colors';
 const modalSelectCls = 'w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 text-sm font-bold outline-none focus:border-blue-400';
 
-const EMPTY = { title: '', description: '', image: '', fee: 0, category: 'Government', color: 'blue', priority: 0, estimatedDays: '7-10 working days', requiredDocs: '', externalLink: '' };
+const EMPTY = {
+    title: '',
+    description: '',
+    image: '',
+    fee: 0,
+    category: 'Government',
+    color: 'blue',
+    priority: 0,
+    estimatedDays: '7-10 working days',
+    requiredDocs: '',
+    mandatoryDocs: '',
+    idProofs: '',
+    addressProofs: '',
+    otherDocs: '',
+    externalLink: ''
+};
 
 const ServicesManager: React.FC = () => {
     const [services, setServices] = useState<any[]>([]);
@@ -60,6 +75,11 @@ const ServicesManager: React.FC = () => {
     };
     const openEdit = (svc: any) => {
         setEditing(svc);
+        const hasCategories = (svc.mandatoryDocs && svc.mandatoryDocs.length > 0) ||
+            (svc.idProofs && svc.idProofs.length > 0) ||
+            (svc.addressProofs && svc.addressProofs.length > 0) ||
+            (svc.otherDocs && svc.otherDocs.length > 0);
+
         setForm({
             title: svc.title,
             description: svc.description,
@@ -70,9 +90,15 @@ const ServicesManager: React.FC = () => {
             priority: svc.priority || 0,
             estimatedDays: svc.estimatedDays || '7-10 working days',
             requiredDocs: Array.isArray(svc.requiredDocs) ? svc.requiredDocs.join(', ') : (svc.requiredDocs || ''),
+            mandatoryDocs: Array.isArray(svc.mandatoryDocs)
+                ? svc.mandatoryDocs.join(', ')
+                : (svc.mandatoryDocs || (!hasCategories && Array.isArray(svc.requiredDocs) ? svc.requiredDocs.join(', ') : '')),
+            idProofs: Array.isArray(svc.idProofs) ? svc.idProofs.join(', ') : (svc.idProofs || ''),
+            addressProofs: Array.isArray(svc.addressProofs) ? svc.addressProofs.join(', ') : (svc.addressProofs || ''),
+            otherDocs: Array.isArray(svc.otherDocs) ? svc.otherDocs.join(', ') : (svc.otherDocs || ''),
             externalLink: svc.externalLink || ''
         });
-        const imgUrl = svc.image?.startsWith('/') ? `${API_BASE}${svc.image}` : svc.image;
+        const imgUrl = getMediaUrl(svc.image);
         setImagePreview(imgUrl);
         setSelectedFile(null);
         setShowModal(true);
@@ -88,13 +114,21 @@ const ServicesManager: React.FC = () => {
         try {
             const formData = new FormData();
             Object.keys(form).forEach(key => {
-                if (key === 'requiredDocs') {
-                    // Send requiredDocs as a regular field - backend will handle splitting if needed or just storing
-                    formData.append('requiredDocs', form.requiredDocs);
-                } else if (key !== 'image') {
+                if (key !== 'image') {
                     formData.append(key, (form as any)[key]);
                 }
             });
+
+            // Combine categories into requiredDocs for 100% backward compatibility
+            const combinedList = [
+                ...form.mandatoryDocs.split(',').map(s => s.trim()).filter(Boolean),
+                ...form.idProofs.split(',').map(s => s.trim()).filter(Boolean),
+                ...form.addressProofs.split(',').map(s => s.trim()).filter(Boolean),
+                ...form.otherDocs.split(',').map(s => s.trim()).filter(Boolean)
+            ];
+            if (combinedList.length > 0) {
+                formData.set('requiredDocs', combinedList.join(', '));
+            }
 
             if (selectedFile) {
                 formData.append('image', selectedFile);
@@ -363,10 +397,66 @@ const ServicesManager: React.FC = () => {
                                 <input value={form.externalLink} onChange={e => setForm(f => ({ ...f, externalLink: e.target.value }))}
                                     placeholder="https://..." className={modalInputCls} />
                             </div>
-                            <div className="col-span-2">
-                                <label className={labelCls}>Required Docs (comma separated)</label>
-                                <input value={form.requiredDocs} onChange={e => setForm(f => ({ ...f, requiredDocs: e.target.value }))}
-                                    placeholder="Aadhar Card, PAN Card, Photo..." className={modalInputCls} />
+                            {/* ── Categorized Document Requirements ── */}
+                            <div className="col-span-2 bg-slate-100/70 p-3.5 rounded-2xl border border-slate-200/80 space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                                        📁 Document Requirements by Category
+                                    </span>
+                                    <span className="text-[10px] font-bold text-slate-400">Comma-separated lists</span>
+                                </div>
+
+                                <div>
+                                    <label className="text-[10px] font-black text-red-600 uppercase tracking-widest block mb-1">
+                                        1. Mandatory Documents (अनिवार्य दस्तावेज़ *)
+                                    </label>
+                                    <input
+                                        value={form.mandatoryDocs}
+                                        onChange={e => setForm(f => ({ ...f, mandatoryDocs: e.target.value }))}
+                                        placeholder="Passport Photo, Signature, Application Form..."
+                                        className={modalInputCls}
+                                    />
+                                    <p className="text-[10px] text-slate-400 font-medium mt-0.5">Customer must upload every item listed here.</p>
+                                </div>
+
+                                <div>
+                                    <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest block mb-1">
+                                        2. Identity Proofs (पहचान पत्र - Any One)
+                                    </label>
+                                    <input
+                                        value={form.idProofs}
+                                        onChange={e => setForm(f => ({ ...f, idProofs: e.target.value }))}
+                                        placeholder="Aadhaar Card, PAN Card, Voter ID, Passport, Driving License..."
+                                        className={modalInputCls}
+                                    />
+                                    <p className="text-[10px] text-slate-400 font-medium mt-0.5">Customer selects and uploads their available ID proof.</p>
+                                </div>
+
+                                <div>
+                                    <label className="text-[10px] font-black text-emerald-600 uppercase tracking-widest block mb-1">
+                                        3. Address Proofs (पते का प्रमाण - Any One)
+                                    </label>
+                                    <input
+                                        value={form.addressProofs}
+                                        onChange={e => setForm(f => ({ ...f, addressProofs: e.target.value }))}
+                                        placeholder="Electricity Bill, Ration Card, Domicile Certificate, Water Bill..."
+                                        className={modalInputCls}
+                                    />
+                                    <p className="text-[10px] text-slate-400 font-medium mt-0.5">Customer selects and uploads their address proof.</p>
+                                </div>
+
+                                <div>
+                                    <label className="text-[10px] font-black text-amber-600 uppercase tracking-widest block mb-1">
+                                        4. Other Supporting Proofs (अन्य सहायक दस्तावेज़ - Optional)
+                                    </label>
+                                    <input
+                                        value={form.otherDocs}
+                                        onChange={e => setForm(f => ({ ...f, otherDocs: e.target.value }))}
+                                        placeholder="Income Certificate, 10th Marksheet, Caste Certificate..."
+                                        className={modalInputCls}
+                                    />
+                                    <p className="text-[10px] text-slate-400 font-medium mt-0.5">Optional supporting proofs uploaded if applicable.</p>
+                                </div>
                             </div>
                             <div className="col-span-2">
                                 <label className={labelCls}>Estimated Processing Timeline</label>

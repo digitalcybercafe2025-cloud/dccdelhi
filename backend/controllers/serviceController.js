@@ -88,9 +88,24 @@ const createService = async (req, res) => {
             serviceData.image = `/uploads/services/${req.file.filename}`;
         }
 
-        // Handle requiredDocs if it comes as a comma-separated string
-        if (serviceData.requiredDocs && typeof serviceData.requiredDocs === 'string') {
-            serviceData.requiredDocs = serviceData.requiredDocs.split(',').map(d => d.trim()).filter(Boolean);
+        // Handle categorized document fields
+        ['mandatoryDocs', 'idProofs', 'addressProofs', 'otherDocs', 'requiredDocs'].forEach(field => {
+            if (serviceData[field] && typeof serviceData[field] === 'string') {
+                try {
+                    serviceData[field] = JSON.parse(serviceData[field]);
+                } catch (e) {
+                    serviceData[field] = serviceData[field].split(',').map(d => d.trim()).filter(Boolean);
+                }
+            }
+        });
+        if (!serviceData.requiredDocs || serviceData.requiredDocs.length === 0) {
+            const combined = [
+                ...(serviceData.mandatoryDocs || []),
+                ...(serviceData.idProofs || []),
+                ...(serviceData.addressProofs || []),
+                ...(serviceData.otherDocs || [])
+            ];
+            if (combined.length > 0) serviceData.requiredDocs = combined;
         }
 
         const service = await Service.create(serviceData);
@@ -110,9 +125,24 @@ const updateService = async (req, res) => {
             updateData.image = `/uploads/services/${req.file.filename}`;
         }
 
-        // Handle requiredDocs if it comes as a comma-separated string
-        if (updateData.requiredDocs && typeof updateData.requiredDocs === 'string') {
-            updateData.requiredDocs = updateData.requiredDocs.split(',').map(d => d.trim()).filter(Boolean);
+        // Handle categorized document fields
+        ['mandatoryDocs', 'idProofs', 'addressProofs', 'otherDocs', 'requiredDocs'].forEach(field => {
+            if (updateData[field] && typeof updateData[field] === 'string') {
+                try {
+                    updateData[field] = JSON.parse(updateData[field]);
+                } catch (e) {
+                    updateData[field] = updateData[field].split(',').map(d => d.trim()).filter(Boolean);
+                }
+            }
+        });
+        if (!updateData.requiredDocs || updateData.requiredDocs.length === 0) {
+            const combined = [
+                ...(updateData.mandatoryDocs || []),
+                ...(updateData.idProofs || []),
+                ...(updateData.addressProofs || []),
+                ...(updateData.otherDocs || [])
+            ];
+            if (combined.length > 0) updateData.requiredDocs = combined;
         }
 
         const service = await Service.findByIdAndUpdate(req.params.id, updateData, {

@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { useDropzone, FileRejection } from 'react-dropzone';
-import { FileText, CheckCircle, ChevronRight, AlertCircle, X, Upload, Eye } from 'lucide-react';
+import { FileText, CheckCircle, ChevronRight, AlertCircle, X, Upload, Eye, ShieldCheck, MapPin, Files } from 'lucide-react';
 import type { ServiceSpecificField } from '../../types';
 
 interface UserDetails {
@@ -18,6 +18,10 @@ interface UserDetails {
 interface ServiceFormProps {
     serviceName: string;
     requiredDocs: string[];
+    mandatoryDocs?: string[];
+    idProofs?: string[];
+    addressProofs?: string[];
+    otherDocs?: string[];
     serviceSpecificFields?: ServiceSpecificField[];
     onComplete: (
         userDetails: UserDetails,
@@ -115,7 +119,11 @@ const DocDropzone: React.FC<{
 
 const ServiceForm: React.FC<ServiceFormProps> = ({
     serviceName,
-    requiredDocs,
+    requiredDocs = [],
+    mandatoryDocs = [],
+    idProofs = [],
+    addressProofs = [],
+    otherDocs = [],
     serviceSpecificFields = [],
     onComplete,
 }) => {
@@ -123,12 +131,30 @@ const ServiceForm: React.FC<ServiceFormProps> = ({
     const [collectedDetails, setCollectedDetails] = useState<UserDetails | null>(null);
     const [collectedSpecific, setCollectedSpecific] = useState<Record<string, string>>({});
     const [uploadedFiles, setUploadedFiles] = useState<{ docType: string; file: File }[]>([]);
-    const [currentDocIndex, setCurrentDocIndex] = useState(0);
+
+    // Category resolution & normalization
+    const hasCategorized = (mandatoryDocs && mandatoryDocs.length > 0) ||
+        (idProofs && idProofs.length > 0) ||
+        (addressProofs && addressProofs.length > 0) ||
+        (otherDocs && otherDocs.length > 0);
+
+    const activeMandatory = hasCategorized ? mandatoryDocs : requiredDocs;
+    const activeIdProofs = idProofs || [];
+    const activeAddressProofs = addressProofs || [];
+    const activeOtherDocs = otherDocs || [];
+
+    // Selected proof types from dropdowns/pills
+    const [selectedIdProof, setSelectedIdProof] = useState<string>(activeIdProofs[0] || '');
+    const [selectedAddressProof, setSelectedAddressProof] = useState<string>(activeAddressProofs[0] || '');
+    const [selectedOtherDoc, setSelectedOtherDoc] = useState<string>(activeOtherDocs[0] || '');
+
+    // Current active slot for single-slot viewing (or fallback)
+    const initialSlot = activeMandatory[0] || selectedIdProof || selectedAddressProof || selectedOtherDoc || 'Document';
+    const [activeDocSlot, setActiveDocSlot] = useState<string>(initialSlot);
 
     const { register, handleSubmit, formState: { errors } } = useForm<UserDetails & Record<string, string>>();
 
     const onDetailsSubmit = (data: UserDetails & Record<string, string>) => {
-        // Separate standard fields from service-specific ones
         const standardKeys = ['fullName', 'mobile', 'email', 'address', 'city', 'state', 'pincode'];
         const specificData: Record<string, string> = {};
         serviceSpecificFields.forEach(f => {
@@ -163,13 +189,27 @@ const ServiceForm: React.FC<ServiceFormProps> = ({
         setUploadedFiles(prev => prev.filter(f => f.docType !== docType));
     };
 
+    // Validation checks
+    const mandatoryMissing = activeMandatory.filter(doc => !getFileForDoc(doc));
+    const hasUploadedId = activeIdProofs.length === 0 || activeIdProofs.some(doc => !!getFileForDoc(doc));
+    const hasUploadedAddress = activeAddressProofs.length === 0 || activeAddressProofs.some(doc => !!getFileForDoc(doc));
+    const isReadyToSubmit = mandatoryMissing.length === 0 && hasUploadedId && hasUploadedAddress;
+
     const handleFinalSubmit = () => {
         if (!collectedDetails) return;
-        const missing = requiredDocs.filter(doc => !getFileForDoc(doc));
-        if (missing.length > 0) {
-            alert(`Please upload: ${missing.join(', ')}`);
+        if (mandatoryMissing.length > 0) {
+            alert(`Please upload mandatory documents: ${mandatoryMissing.join(', ')}`);
             return;
         }
+        if (!hasUploadedId) {
+            alert(`Please select and upload at least 1 Identity Proof.`);
+            return;
+        }
+        if (!hasUploadedAddress) {
+            alert(`Please select and upload at least 1 Address Proof.`);
+            return;
+        }
+
         onComplete(
             collectedDetails,
             uploadedFiles.map(f => {
@@ -181,8 +221,10 @@ const ServiceForm: React.FC<ServiceFormProps> = ({
         );
     };
 
-    const uploadedCount = uploadedFiles.filter(f => requiredDocs.includes(f.docType)).length;
-    const totalDocs = requiredDocs.length;
+    // Progress counter
+    const totalRequiredCount = activeMandatory.length + (activeIdProofs.length > 0 ? 1 : 0) + (activeAddressProofs.length > 0 ? 1 : 0);
+    const completedRequiredCount = (activeMandatory.length - mandatoryMissing.length) + (hasUploadedId && activeIdProofs.length > 0 ? 1 : 0) + (hasUploadedAddress && activeAddressProofs.length > 0 ? 1 : 0);
+    const progressPercent = totalRequiredCount > 0 ? Math.round((completedRequiredCount / totalRequiredCount) * 100) : 100;
 
     const inputClass = "theme-input w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-white/10 outline-none focus:ring-2 focus:ring-brand/20 dark:focus:ring-emerald-500/20 focus:border-brand/50 dark:focus:border-emerald-500/50 font-bold transition-all";
     const labelClass = "text-xs font-bold text-slate-500 dark:text-slate-400 ml-1";
@@ -288,95 +330,269 @@ const ServiceForm: React.FC<ServiceFormProps> = ({
             <div className="bg-blue-50 dark:bg-blue-500/10 p-4 rounded-xl border border-blue-100 dark:border-blue-500/20 flex gap-3">
                 <AlertCircle className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
                 <div>
-                    <h4 className="text-sm font-bold text-blue-700 dark:text-blue-300">Required Documents for {serviceName}</h4>
-                    <p className="text-xs text-blue-600/80 dark:text-blue-300/80 mt-0.5">Upload clear photos or PDF scans. Max 5MB per file. GIF, JPG, PNG, PDF accepted.</p>
+                    <h4 className="text-sm font-bold text-blue-700 dark:text-blue-300">Document Upload for {serviceName}</h4>
+                    <p className="text-xs text-blue-600/80 dark:text-blue-300/80 mt-0.5">Please upload clear photos or PDF scans. JPG, PNG, PDF accepted (Max 5MB each).</p>
                 </div>
             </div>
 
             {/* Progress Bar */}
             <div className="flex items-center gap-3">
-                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 whitespace-nowrap">{uploadedCount}/{totalDocs} Uploaded</span>
+                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                    {completedRequiredCount}/{totalRequiredCount} Required Sections Ready
+                </span>
                 <div className="flex-1 h-1.5 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
                     <div
                         className="h-full bg-brand dark:bg-emerald-500 rounded-full transition-all duration-700"
-                        style={{ width: `${totalDocs ? (uploadedCount / totalDocs) * 100 : 0}%` }}
+                        style={{ width: `${progressPercent}%` }}
                     />
                 </div>
-                <span className="text-xs font-black text-brand dark:text-emerald-400">{totalDocs ? Math.round((uploadedCount / totalDocs) * 100) : 0}%</span>
+                <span className="text-xs font-black text-brand dark:text-emerald-400">{progressPercent}%</span>
             </div>
 
-            {/* Document tabs */}
-            <div className="flex flex-wrap gap-2">
-                {requiredDocs.map((doc, idx) => {
-                    const uploaded = !!getFileForDoc(doc);
-                    return (
-                        <button
-                            key={idx}
-                            type="button"
-                            onClick={() => setCurrentDocIndex(idx)}
-                            className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${currentDocIndex === idx
-                                ? 'bg-brand dark:bg-emerald-600 text-white shadow-md'
-                                : uploaded
-                                    ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
-                                    : 'bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10'
-                                }`}
-                        >
-                            {uploaded && <CheckCircle className="inline w-3 h-3 mr-1" />}
-                            {doc}
-                        </button>
-                    );
-                })}
-            </div>
+            {/* 1. MANDATORY DOCUMENTS */}
+            {activeMandatory.length > 0 && (
+                <div className="p-4 rounded-2xl border border-red-200/80 bg-red-50/30 dark:bg-red-500/5 space-y-3">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                            <h5 className="text-xs font-black uppercase tracking-wider text-red-700 dark:text-red-400">
+                                1. Mandatory Documents (अनिवार्य दस्तावेज *)
+                            </h5>
+                        </div>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300">
+                            Compulsory
+                        </span>
+                    </div>
 
-            <div className="space-y-2">
-                <p className="text-sm font-bold text-slate-600 dark:text-slate-300">
-                    Uploading: <span className="text-brand dark:text-emerald-400">{requiredDocs[currentDocIndex]}</span>
-                    <span className="text-red-500 font-black ml-1">*</span>
-                </p>
-                <DocDropzone
-                    docName={requiredDocs[currentDocIndex]}
-                    file={getFileForDoc(requiredDocs[currentDocIndex])?.file}
-                    onFileAccepted={(file) => setFileForDoc(requiredDocs[currentDocIndex], file)}
-                    onRemove={() => removeFileForDoc(requiredDocs[currentDocIndex])}
-                />
-            </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {activeMandatory.map(doc => {
+                            const fileObj = getFileForDoc(doc);
+                            return (
+                                <div key={doc} className="p-3 bg-white dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-white/10 space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{doc} *</span>
+                                        {fileObj && <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Ready</span>}
+                                    </div>
+                                    <DocDropzone
+                                        docName={doc}
+                                        file={fileObj?.file}
+                                        onFileAccepted={(f) => setFileForDoc(doc, f)}
+                                        onRemove={() => removeFileForDoc(doc)}
+                                    />
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
 
-            {/* Doc navigation */}
-            <div className="flex justify-between items-center">
-                <button
-                    type="button"
-                    onClick={() => setCurrentDocIndex(Math.max(0, currentDocIndex - 1))}
-                    disabled={currentDocIndex === 0}
-                    className="text-sm font-bold text-slate-500 dark:text-slate-400 disabled:opacity-30 hover:text-slate-700 dark:hover:text-slate-200 transition"
-                >
-                    ← Previous
-                </button>
-                {currentDocIndex < requiredDocs.length - 1 ? (
-                    <button
-                        type="button"
-                        onClick={() => setCurrentDocIndex(currentDocIndex + 1)}
-                        className="text-sm font-bold text-brand dark:text-emerald-400 hover:opacity-70 transition"
-                    >
-                        Next Document →
-                    </button>
-                ) : null}
-            </div>
+            {/* 2. IDENTITY PROOFS */}
+            {activeIdProofs.length > 0 && (
+                <div className="p-4 rounded-2xl border border-blue-200/80 bg-blue-50/30 dark:bg-blue-500/5 space-y-3">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <ShieldCheck className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                            <h5 className="text-xs font-black uppercase tracking-wider text-blue-700 dark:text-blue-400">
+                                2. Identity Proof (पहचान पत्र - Choose Any 1)
+                            </h5>
+                        </div>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${hasUploadedId ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
+                            {hasUploadedId ? '✓ Verified' : 'Required (Any 1)'}
+                        </span>
+                    </div>
 
+                    <div className="space-y-2">
+                        <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400">Select Document Type to Upload:</label>
+                        <div className="flex flex-wrap gap-2">
+                            {activeIdProofs.map(doc => {
+                                const isUploaded = !!getFileForDoc(doc);
+                                const isSelected = selectedIdProof === doc;
+                                return (
+                                    <button
+                                        key={doc}
+                                        type="button"
+                                        onClick={() => setSelectedIdProof(doc)}
+                                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${isSelected
+                                            ? 'bg-blue-600 text-white shadow-md'
+                                            : isUploaded
+                                                ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-300'
+                                                : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-white/10 hover:border-blue-300'
+                                            }`}
+                                    >
+                                        {isUploaded && <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />}
+                                        {doc}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {selectedIdProof && (
+                        <div className="p-3 bg-white dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-white/10 space-y-2 mt-2">
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                                    Upload Selected ID: <strong className="text-blue-600">{selectedIdProof}</strong>
+                                </span>
+                                {getFileForDoc(selectedIdProof) && (
+                                    <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-1">
+                                        <CheckCircle className="w-3 h-3" /> Ready
+                                    </span>
+                                )}
+                            </div>
+                            <DocDropzone
+                                docName={selectedIdProof}
+                                file={getFileForDoc(selectedIdProof)?.file}
+                                onFileAccepted={(f) => setFileForDoc(selectedIdProof, f)}
+                                onRemove={() => removeFileForDoc(selectedIdProof)}
+                            />
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* 3. ADDRESS PROOFS */}
+            {activeAddressProofs.length > 0 && (
+                <div className="p-4 rounded-2xl border border-emerald-200/80 bg-emerald-50/30 dark:bg-emerald-500/5 space-y-3">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <MapPin className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                            <h5 className="text-xs font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                                3. Address Proof (पते का प्रमाण - Choose Any 1)
+                            </h5>
+                        </div>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${hasUploadedAddress ? 'bg-emerald-100 text-emerald-700' : 'bg-emerald-100 text-emerald-800'}`}>
+                            {hasUploadedAddress ? '✓ Verified' : 'Required (Any 1)'}
+                        </span>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400">Select Document Type to Upload:</label>
+                        <div className="flex flex-wrap gap-2">
+                            {activeAddressProofs.map(doc => {
+                                const isUploaded = !!getFileForDoc(doc);
+                                const isSelected = selectedAddressProof === doc;
+                                return (
+                                    <button
+                                        key={doc}
+                                        type="button"
+                                        onClick={() => setSelectedAddressProof(doc)}
+                                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${isSelected
+                                            ? 'bg-emerald-600 text-white shadow-md'
+                                            : isUploaded
+                                                ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-300'
+                                                : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-white/10 hover:border-emerald-300'
+                                            }`}
+                                    >
+                                        {isUploaded && <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />}
+                                        {doc}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {selectedAddressProof && (
+                        <div className="p-3 bg-white dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-white/10 space-y-2 mt-2">
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                                    Upload Selected Address Proof: <strong className="text-emerald-600">{selectedAddressProof}</strong>
+                                </span>
+                                {getFileForDoc(selectedAddressProof) && (
+                                    <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-1">
+                                        <CheckCircle className="w-3 h-3" /> Ready
+                                    </span>
+                                )}
+                            </div>
+                            <DocDropzone
+                                docName={selectedAddressProof}
+                                file={getFileForDoc(selectedAddressProof)?.file}
+                                onFileAccepted={(f) => setFileForDoc(selectedAddressProof, f)}
+                                onRemove={() => removeFileForDoc(selectedAddressProof)}
+                            />
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* 4. OTHER SUPPORTING PROOFS (OPTIONAL) */}
+            {activeOtherDocs.length > 0 && (
+                <div className="p-4 rounded-2xl border border-amber-200/80 bg-amber-50/30 dark:bg-amber-500/5 space-y-3">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <Files className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                            <h5 className="text-xs font-black uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                                4. Other Supporting Proofs (अन्य सहायक दस्तावेज़ - Optional)
+                            </h5>
+                        </div>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                            Optional
+                        </span>
+                    </div>
+
+                    <div className="space-y-2">
+                        <div className="flex flex-wrap gap-2">
+                            {activeOtherDocs.map(doc => {
+                                const isUploaded = !!getFileForDoc(doc);
+                                const isSelected = selectedOtherDoc === doc;
+                                return (
+                                    <button
+                                        key={doc}
+                                        type="button"
+                                        onClick={() => setSelectedOtherDoc(doc)}
+                                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${isSelected
+                                            ? 'bg-amber-600 text-white shadow-md'
+                                            : isUploaded
+                                                ? 'bg-emerald-100 text-emerald-700 border border-emerald-300'
+                                                : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 hover:border-amber-300'
+                                            }`}
+                                    >
+                                        {isUploaded && <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />}
+                                        {doc}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {selectedOtherDoc && (
+                        <div className="p-3 bg-white dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-white/10 space-y-2 mt-2">
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                                    Upload: <strong className="text-amber-600">{selectedOtherDoc}</strong>
+                                </span>
+                                {getFileForDoc(selectedOtherDoc) && (
+                                    <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-1">
+                                        <CheckCircle className="w-3 h-3" /> Ready
+                                    </span>
+                                )}
+                            </div>
+                            <DocDropzone
+                                docName={selectedOtherDoc}
+                                file={getFileForDoc(selectedOtherDoc)?.file}
+                                onFileAccepted={(f) => setFileForDoc(selectedOtherDoc, f)}
+                                onRemove={() => removeFileForDoc(selectedOtherDoc)}
+                            />
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Bottom Actions */}
             <div className="flex gap-4 pt-2">
                 <button
                     type="button"
                     onClick={() => setStep('details')}
-                    className="flex-1 py-4 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-sm uppercase tracking-widest hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
+                    className="flex-1 py-4 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-sm uppercase tracking-widest hover:bg-slate-200 dark:hover:bg-slate-700 transition-all cursor-pointer"
                 >
                     Back
                 </button>
                 <button
                     type="button"
                     onClick={handleFinalSubmit}
-                    disabled={uploadedCount < totalDocs}
-                    className="flex-[2] py-4 rounded-xl bg-brand dark:bg-emerald-600 text-white font-black text-sm uppercase tracking-widest hover:opacity-90 transition-all shadow-lg shadow-brand/20 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
+                    disabled={!isReadyToSubmit}
+                    className="flex-[2] py-4 rounded-xl bg-brand dark:bg-emerald-600 text-white font-black text-sm uppercase tracking-widest hover:opacity-90 transition-all shadow-lg shadow-brand/20 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 cursor-pointer"
                 >
-                    {uploadedCount < totalDocs ? `Upload ${totalDocs - uploadedCount} More Doc(s)` : 'Proceed to Payment →'}
+                    {isReadyToSubmit ? 'Proceed to Payment →' : 'Complete Required Documents'}
                 </button>
             </div>
         </div>

@@ -46,29 +46,28 @@ const generateAcknowledgementReceipt = async (data) => {
             // Divider Line
             doc.moveTo(30, 120).lineTo(565, 120).strokeColor('#CCCCCC').stroke();
 
-            // 2. TITLE SECTION
-            doc.moveDown(1);
-            doc.fillColor('#000000').fontSize(16).font('Helvetica-Bold');
-            doc.text('ACKNOWLEDGEMENT RECEIPT', { align: 'center', underline: true });
-            doc.moveDown(1);
+            // 2. TITLE SECTION - Navy Blue Banner matching Screenshot
+            doc.rect(30, 130, 535, 26).fill('#1e3a5f');
+            doc.fillColor('#FFFFFF').fontSize(13).font('Helvetica-Bold');
+            doc.text('ACKNOWLEDGEMENT RECEIPT', 30, 137, { align: 'center', width: 535 });
 
             // 3. APPLICATION DETAILS TABLE
             const table = {
                 title: "",
                 headers: [
-                    { label: "Field", property: 'field', width: 250, renderer: null },
-                    { label: "Value", property: 'value', width: 285, renderer: null }
+                    { label: "Field", property: 'field', width: 230, renderer: null },
+                    { label: "Value", property: 'value', width: 305, renderer: null }
                 ],
                 datas: [
                     { field: "Application ID:", value: data.trackingId },
                     { field: "Service Applied:", value: data.serviceName },
-                    { field: "Applicant Name:", value: data.userDetails.fullName },
-                    { field: "Mobile Number:", value: data.userDetails.mobile },
-                    { field: "Address:", value: `${data.userDetails.address}, ${data.userDetails.city}, ${data.userDetails.state} - ${data.userDetails.pincode}` },
-                    { field: "Payment Status:", value: data.paymentDetails.paymentStatus === 'Paid' ? 'Paid Successfully' : data.paymentDetails.paymentStatus },
-                    { field: "Transaction ID:", value: data.paymentDetails.transactionId || 'N/A' },
-                    { field: "Payment Amount:", value: `₹ ${data.paymentDetails.amount.toFixed(2)}` },
-                    { field: "Date & Time:", value: new Date(data.createdAt).toLocaleString('en-IN', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }) }
+                    { field: "Applicant Name:", value: (data.userDetails?.fullName || '').toUpperCase() },
+                    { field: "Mobile Number:", value: data.userDetails?.mobile || '' },
+                    { field: "Address:", value: `${data.userDetails?.address || ''}, ${data.userDetails?.city || ''}, ${data.userDetails?.state || ''} - ${data.userDetails?.pincode || ''}`.toUpperCase() },
+                    { field: "Payment Status:", value: data.paymentDetails?.paymentStatus === 'Paid' ? 'Paid Successfully' : (data.paymentDetails?.paymentStatus || 'Paid') },
+                    { field: "Transaction ID:", value: data.paymentDetails?.transactionId || 'N/A' },
+                    { field: "Payment Amount:", value: `₹ ${Number(data.paymentDetails?.amount || 0).toFixed(2)}` },
+                    { field: "Date & Time:", value: new Date(data.createdAt || Date.now()).toLocaleString('en-IN', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }) }
                 ],
                 options: {
                     columnSpacing: 10,
@@ -79,24 +78,24 @@ const generateAcknowledgementReceipt = async (data) => {
                     },
                     prepareHeader: () => doc.font("Helvetica-Bold").fontSize(12),
                     prepareRow: (row, index, column, rectRow, rectCell) => {
-                        doc.font("Helvetica").fontSize(11).fillColor('#333333');
+                        doc.font("Helvetica").fontSize(10).fillColor('#333333');
                     },
                 }
             };
 
             doc.table(table, {
                 x: 30,
-                y: 160,
+                y: 168,
                 prepareHeader: () => doc.font("Helvetica-Bold").fontSize(0), // Hide headers
             });
 
             // 4. ATTACHED DOCUMENTS & PHOTO
-            const photoY = doc.y + 20;
-            doc.fillColor('#000000').fontSize(12).font('Helvetica-Bold');
+            const photoY = doc.y + 15;
+            doc.fillColor('#000000').fontSize(11).font('Helvetica-Bold');
             doc.text('Attached Documents:', 30, photoY);
 
-            doc.fontSize(10).font('Helvetica').fillColor('#333333');
-            const docsList = data.documents.map((d, i) => `${i + 1}. ${d.originalName || d.fileName || d.docType}`);
+            doc.fontSize(9.5).font('Helvetica').fillColor('#333333');
+            const docsList = data.documents.map((d, i) => `${i + 1}. ${d.docType || d.originalName || d.fileName || ('Document ' + (i + 1))}`);
 
             if (docsList.length === 0) {
                 doc.text('1. No documents attached', 30, photoY + 20);

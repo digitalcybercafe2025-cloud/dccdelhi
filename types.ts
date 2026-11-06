@@ -36,6 +36,10 @@ export interface Service {
   image: string;
   fee: number;
   requiredDocs: string[];
+  mandatoryDocs?: string[];
+  idProofs?: string[];
+  addressProofs?: string[];
+  otherDocs?: string[];
   serviceSpecificFields?: ServiceSpecificField[]; // Dynamic per-service fields
   category: string;
   externalLink?: string;

@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import ServiceForm from '../components/ServiceForm';
 import { PaymentSection } from '../components/PaymentSection';
+import { AcknowledgementReceipt } from '../components/AcknowledgementReceipt';
 import { SERVICES } from '../../constants';
 import api from '../api/axios';
 import { generateReceipt } from '../utils/pdfGenerator';
-import { Loader2, ArrowLeft, CheckCircle, Download, Hash } from 'lucide-react';
+import { toJpeg } from 'html-to-image';
+import { Loader2, ArrowLeft, CheckCircle, Download, Image as ImageIcon, Hash } from 'lucide-react';
 
 type Step = 'form' | 'payment' | 'success';
 
@@ -25,6 +27,8 @@ export const ApplyService: React.FC = () => {
     const [isProcessing, setIsProcessing] = useState(false);
     const [applicationResult, setApplicationResult] = useState<any>(null);
     const [copied, setCopied] = useState(false);
+    const [downloadingJpeg, setDownloadingJpeg] = useState(false);
+    const receiptRef = useRef<HTMLDivElement>(null);
 
     // Collected from ServiceForm
     const [collectedUserDetails, setCollectedUserDetails] = useState<any>(null);
@@ -106,6 +110,10 @@ export const ApplyService: React.FC = () => {
                 formDataToSend.append('serviceSpecificFields', JSON.stringify(collectedSpecificFields));
             }
 
+            // Append document types array for clean names (e.g. Aadhaar Card, PAN Card)
+            const docTypes = collectedFiles.map((file, index) => (file as any).docType || file.name || `Document ${index + 1}`);
+            formDataToSend.append('documentTypes', JSON.stringify(docTypes));
+
             // Append uploaded files
             collectedFiles.forEach((file, index) => {
                 formDataToSend.append(`document_${index}`, file, file.name);
@@ -138,6 +146,27 @@ export const ApplyService: React.FC = () => {
                 paymentDate: applicationResult.paymentDetails?.paymentDate || new Date()
             }
         });
+    };
+
+    const handleDownloadJpeg = async () => {
+        if (!receiptRef.current) return;
+        try {
+            setDownloadingJpeg(true);
+            const dataUrl = await toJpeg(receiptRef.current, {
+                quality: 0.95,
+                pixelRatio: 2,
+                backgroundColor: '#ffffff'
+            });
+            const link = document.createElement('a');
+            link.download = `Receipt-${applicationResult?.trackingId || 'Application'}.jpg`;
+            link.href = dataUrl;
+            link.click();
+        } catch (err) {
+            console.error('Failed to generate receipt image:', err);
+            alert('Could not download image. Please use Download PDF instead.');
+        } finally {
+            setDownloadingJpeg(false);
+        }
     };
 
     const handleCopyId = () => {
@@ -225,6 +254,10 @@ export const ApplyService: React.FC = () => {
                             <ServiceForm
                                 serviceName={service.title}
                                 requiredDocs={service.requiredDocs}
+                                mandatoryDocs={service.mandatoryDocs}
+                                idProofs={service.idProofs}
+                                addressProofs={service.addressProofs}
+                                otherDocs={service.otherDocs}
                                 serviceSpecificFields={service.serviceSpecificFields}
                                 onComplete={handleFormComplete}
                             />
@@ -242,51 +275,75 @@ export const ApplyService: React.FC = () => {
 
                         {/* ── SUCCESS ── */}
                         {step === 'success' && applicationResult && (
-                            <div className="text-center py-8 animate-in zoom-in-95 duration-500">
+                            <div className="text-center py-6 animate-in zoom-in-95 duration-500 space-y-6">
                                 {/* Success icon */}
-                                <div className="w-24 h-24 bg-emerald-100 dark:bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl shadow-emerald-500/20">
-                                    <CheckCircle className="w-12 h-12 text-emerald-500 dark:text-emerald-400" />
+                                <div className="w-20 h-20 bg-emerald-100 dark:bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto shadow-xl shadow-emerald-500/20">
+                                    <CheckCircle className="w-10 h-10 text-emerald-500 dark:text-emerald-400" />
                                 </div>
 
-                                <h2 className="text-3xl font-black text-slate-900 dark:text-white mb-2 tracking-tighter">Application Submitted!</h2>
-                                <p className="text-slate-500 dark:text-slate-400 font-medium mb-8">
-                                    Your application for <strong className="text-slate-700 dark:text-slate-200">{service.title}</strong> has been received. You'll be notified on updates.
-                                </p>
-
-                                {/* Tracking ID Card */}
-                                <div className="bg-gradient-to-br from-slate-50 to-emerald-50 dark:from-slate-800/50 dark:to-emerald-500/10 p-6 rounded-2xl border border-emerald-200/50 dark:border-emerald-500/20 inline-block mb-8 w-full max-w-sm shadow-inner">
-                                    <div className="flex items-center justify-center gap-2 mb-2">
-                                        <Hash className="w-4 h-4 text-slate-400" />
-                                        <p className="text-xs text-slate-400 font-black uppercase tracking-widest">Your Tracking ID</p>
-                                    </div>
-                                    <p className="text-3xl font-black text-brand dark:text-emerald-400 tracking-wider break-all mb-4">
-                                        {applicationResult.trackingId}
+                                <div>
+                                    <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white mb-2 tracking-tighter">
+                                        Application Submitted Successfully!
+                                    </h2>
+                                    <p className="text-slate-500 dark:text-slate-400 font-medium text-sm">
+                                        Your application for <strong className="text-slate-700 dark:text-slate-200">{service.title}</strong> has been received with verified payment.
                                     </p>
+                                </div>
+
+                                {/* Tracking ID Bar */}
+                                <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-emerald-50 dark:from-slate-800/80 dark:to-emerald-500/10 p-4 sm:p-5 rounded-2xl border border-blue-200/60 dark:border-white/10 inline-flex flex-col sm:flex-row items-center gap-4 justify-between w-full max-w-xl shadow-sm">
+                                    <div className="flex items-center gap-3 text-left">
+                                        <div className="w-10 h-10 rounded-xl bg-blue-600/10 flex items-center justify-center text-blue-600">
+                                            <Hash className="w-5 h-5" />
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Tracking Reference ID</p>
+                                            <p className="text-xl sm:text-2xl font-black text-brand dark:text-emerald-400 font-mono tracking-wider">
+                                                {applicationResult.trackingId}
+                                            </p>
+                                        </div>
+                                    </div>
                                     <button
                                         onClick={handleCopyId}
-                                        className="px-4 py-2 rounded-lg bg-brand/10 dark:bg-emerald-500/10 text-brand dark:text-emerald-400 text-xs font-black uppercase tracking-widest hover:bg-brand/20 dark:hover:bg-emerald-500/20 transition-colors"
+                                        className="px-4 py-2.5 rounded-xl bg-white dark:bg-slate-700 text-slate-700 dark:text-white border border-slate-200 text-xs font-black uppercase tracking-wider hover:bg-slate-50 shadow-sm transition-all cursor-pointer"
                                     >
-                                        {copied ? '✓ Copied!' : 'Copy ID'}
+                                        {copied ? '✓ Copied' : 'Copy ID'}
                                     </button>
                                 </div>
 
-                                <p className="text-xs text-slate-400 font-bold mb-6">
-                                    ⚠ Save this ID to track your application status
-                                </p>
-
-                                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                                {/* Two Download Buttons (PDF + JPEG) */}
+                                <div className="flex flex-wrap gap-3 justify-center pt-2">
                                     <button
+                                        type="button"
                                         onClick={handleDownloadReceipt}
-                                        className="px-8 py-4 bg-brand dark:bg-emerald-600 text-white rounded-xl font-black text-sm uppercase tracking-widest hover:opacity-90 shadow-lg shadow-brand/20 dark:shadow-emerald-500/20 flex items-center justify-center gap-2 transform active:scale-95 transition-all"
+                                        className="px-6 py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs uppercase tracking-wider shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 transform active:scale-95 transition-all cursor-pointer"
                                     >
-                                        <Download className="w-4 h-4" /> Download Receipt PDF
+                                        <Download className="w-4 h-4" /> Download PDF Receipt
                                     </button>
                                     <button
+                                        type="button"
+                                        onClick={handleDownloadJpeg}
+                                        disabled={downloadingJpeg}
+                                        className="px-6 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs uppercase tracking-wider shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2 transform active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+                                    >
+                                        {downloadingJpeg ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
+                                        {downloadingJpeg ? 'Saving JPEG...' : 'Download JPEG Slip'}
+                                    </button>
+                                    <button
+                                        type="button"
                                         onClick={() => navigate('/track')}
-                                        className="px-8 py-4 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-xl font-black text-sm uppercase tracking-widest hover:bg-slate-50 dark:hover:bg-slate-700 transition-all"
+                                        className="px-6 py-3.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-black text-xs uppercase tracking-wider hover:bg-slate-50 transition-all cursor-pointer"
                                     >
                                         Track Application
                                     </button>
+                                </div>
+
+                                {/* Visual Slip Preview matching Reference Image */}
+                                <div className="pt-4 overflow-x-auto pb-4">
+                                    <p className="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-3 text-center">
+                                        Official Acknowledgement Receipt Preview
+                                    </p>
+                                    <AcknowledgementReceipt ref={receiptRef} application={applicationResult} />
                                 </div>
                             </div>
                         )}
