@@ -10,7 +10,9 @@ const {
     uploadCertificate,
     uploadCertificateMiddleware,
     getReceipt,
-    downloadCertificate
+    downloadCertificate,
+    deleteApplication,
+    deleteApplicationDocument
 } = require('../controllers/applicationController');
 const { protect } = require('../middleware/authMiddleware');
 const upload = require('../middleware/uploadMiddleware');
@@ -25,6 +27,8 @@ router.get('/:id/certificate/download', downloadCertificate);
 router.get('/', protect, getApplications);
 router.get('/:id', protect, getApplicationById);
 router.put('/:id', protect, updateApplicationStatus);
+router.delete('/:id', protect, deleteApplication);
+router.delete('/:id/documents/:docIndex', protect, deleteApplicationDocument);
 router.get('/:id/documents/:docIndex/download', protect, downloadDocument);
 router.post('/:id/certificate', protect, uploadCertificateMiddleware.single('certificate'), uploadCertificate);
 

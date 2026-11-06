@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../api/axios';
 import { SERVICES } from '../../../constants';
-import { Download, Eye, X } from 'lucide-react';
+import { Download, Eye, X, Trash2, AlertTriangle, Check, Loader2 } from 'lucide-react';
 
 // ── Status badge tokens matching Dashboard ────────────────────────────────────
 const STATUS_STYLES: Record<string, string> = {
@@ -20,8 +20,15 @@ const STATUS_LABELS: Record<string, string> = {
     rejected: 'Rejected'
 };
 
-const inputCls = 'px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 placeholder:text-slate-400 text-sm font-bold outline-none focus:border-blue-400 transition-colors';
-const sectionLabelCls = 'text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2';
+const getCleanDocName = (doc: any, index: number) => {
+    if (doc.docType && !doc.docType.toLowerCase().startsWith('document_') && !doc.docType.toLowerCase().startsWith('documents_')) {
+        return doc.docType;
+    }
+    if (doc.originalName) {
+        return doc.originalName.replace(/\.[^/.]+$/, '');
+    }
+    return `Document ${index + 1}`;
+};
 
 const ApplicationsManager: React.FC = () => {
     const [applications, setApplications] = useState<any[]>([]);
@@ -42,6 +49,13 @@ const ApplicationsManager: React.FC = () => {
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [previewLoading, setPreviewLoading] = useState(false);
 
+    // Delete Modal State
+    const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+    const [deletingTarget, setDeletingTarget] = useState<any | null>(null);
+    const [deleteConfirmText, setDeleteConfirmText] = useState('');
+    const [deleting, setDeleting] = useState(false);
+    const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
     const fetchApps = useCallback(async (page = 1) => {
         setLoading(true);
         try {
@@ -53,8 +67,8 @@ const ApplicationsManager: React.FC = () => {
             if (endDate) params.endDate = endDate;
 
             const res = await api.get('/applications', { params });
-            setApplications(res.data.data);
-            setPagination(res.data.pagination);
+            setApplications(res.data.data || []);
+            setPagination(res.data.pagination || { total: 0, page: 1, pages: 1 });
         } catch (e) { console.error(e); }
         finally { setLoading(false); }
     }, [search, statusFilter, serviceFilter, startDate, endDate]);
@@ -148,35 +162,70 @@ const ApplicationsManager: React.FC = () => {
     const downloadFromPreview = () => {
         if (!selected || previewDocIndex === null) return;
         const doc = selected.documents[previewDocIndex];
-        downloadDocument(selected._id, previewDocIndex, doc.originalName || doc.fileName || `document_${previewDocIndex}`);
+        const cleanName = getCleanDocName(doc, previewDocIndex);
+        downloadDocument(selected._id, previewDocIndex, doc.originalName || cleanName);
+    };
+
+    const openDeleteAppModal = (app: any) => {
+        setDeletingTarget(app);
+        setDeleteConfirmText('');
+        setDeleteModalOpen(true);
+    };
+
+    const handleConfirmDeleteApp = async () => {
+        if (!deletingTarget || deleteConfirmText.trim().toUpperCase() !== 'DELETE') return;
+        setDeleting(true);
+        try {
+            await api.delete(`/applications/${deletingTarget._id}`);
+            setFeedback({ type: 'success', message: `Application #${deletingTarget.trackingId} deleted permanently.` });
+            setDeleteModalOpen(false);
+            if (selected?._id === deletingTarget._id) {
+                setSelected(null);
+            }
+            setDeletingTarget(null);
+            setDeleteConfirmText('');
+            await fetchApps(pagination.page);
+            setTimeout(() => setFeedback(null), 3000);
+        } catch (err: any) {
+            setFeedback({ type: 'error', message: err.response?.data?.message || 'Failed to delete application.' });
+        } finally {
+            setDeleting(false);
+        }
     };
 
     const hasActiveFilters = search || statusFilter !== 'all' || serviceFilter !== 'all' || startDate || endDate;
 
     return (
-        <div className="space-y-4">
-            {/* ── Search + Filters ── */}
-            <div className="bg-white border border-slate-100 shadow-sm rounded-[2rem] p-6 space-y-4">
-                <div className="flex flex-col lg:flex-row gap-4">
+        <div className="space-y-3 animate-in fade-in duration-300">
+            {/* ── Search + Filters (Compact) ── */}
+            <div className="bg-white border border-slate-100 shadow-sm rounded-2xl p-4 space-y-3">
+                <div className="flex flex-col lg:flex-row gap-3">
                     {/* Search row */}
                     <form onSubmit={handleSearch} className="flex-1 flex gap-2">
                         <div className="relative flex-1">
-                            <input value={searchInput} onChange={e => setSearchInput(e.target.value)}
+                            <input
+                                value={searchInput}
+                                onChange={e => setSearchInput(e.target.value)}
                                 placeholder="Search applicant, tracking ID, mobile..."
-                                className="w-full pl-11 pr-4 py-3.5 rounded-2xl bg-slate-50 border-none text-slate-800 placeholder:text-slate-400 text-sm font-bold outline-none ring-2 ring-transparent focus:ring-indigo-500/20 transition-all" />
-                            <svg className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+                                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder:text-slate-400 text-xs font-semibold outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-400 transition-all"
+                            />
+                            <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
                         </div>
-                        <button type="submit"
-                            className="px-6 py-3.5 bg-indigo-600 hover:bg-indigo-700 rounded-2xl text-white font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-indigo-500/20 active:scale-95">
+                        <button
+                            type="submit"
+                            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-xl text-white font-black text-xs uppercase tracking-wider transition-all shadow-sm active:scale-95"
+                        >
                             Search
                         </button>
                     </form>
 
                     {/* Filter row */}
                     <div className="flex flex-wrap gap-2 items-center">
-                        {/* Service filter */}
-                        <select value={serviceFilter} onChange={e => setServiceFilter(e.target.value)}
-                            className="px-4 py-3.5 rounded-2xl bg-slate-50 border-none text-slate-600 text-xs font-black uppercase tracking-widest outline-none ring-2 ring-transparent focus:ring-indigo-500/20 transition-all appearance-none min-w-[160px]">
+                        <select
+                            value={serviceFilter}
+                            onChange={e => setServiceFilter(e.target.value)}
+                            className="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/10 transition-all min-w-[140px]"
+                        >
                             <option value="all">All Services</option>
                             {SERVICES.map(svc => (
                                 <option key={svc.id} value={svc.id}>{svc.title}</option>
@@ -184,111 +233,142 @@ const ApplicationsManager: React.FC = () => {
                         </select>
 
                         {/* Date range */}
-                        <div className="flex items-center gap-2 bg-slate-50 rounded-2xl px-2 py-1.5 ring-2 ring-transparent">
-                            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} title="Start"
-                                className="bg-transparent border-none text-slate-600 text-[10px] font-black uppercase tracking-widest outline-none px-2" />
+                        <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2 py-1">
+                            <input
+                                type="date"
+                                value={startDate}
+                                onChange={e => setStartDate(e.target.value)}
+                                className="bg-transparent border-none text-slate-600 text-[10px] font-bold outline-none"
+                            />
                             <span className="text-slate-300">/</span>
-                            <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} title="End"
-                                className="bg-transparent border-none text-slate-600 text-[10px] font-black uppercase tracking-widest outline-none px-2" />
+                            <input
+                                type="date"
+                                value={endDate}
+                                onChange={e => setEndDate(e.target.value)}
+                                className="bg-transparent border-none text-slate-600 text-[10px] font-bold outline-none"
+                            />
                         </div>
 
                         {hasActiveFilters && (
-                            <button type="button" onClick={clearFilters}
-                                className="p-3.5 bg-red-50 hover:bg-red-100 rounded-2xl text-red-500 transition-all active:scale-90">
-                                <X className="w-5 h-5" />
+                            <button
+                                type="button"
+                                onClick={clearFilters}
+                                className="p-2 bg-red-50 hover:bg-red-100 rounded-xl text-red-500 transition-all"
+                                title="Clear filters"
+                            >
+                                <X className="w-4 h-4" />
                             </button>
                         )}
                     </div>
                 </div>
 
-                {/* Status pills */}
-                <div className="flex gap-2 flex-wrap pt-2 border-t border-slate-50">
-                    <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] self-center mr-2">Filter By Status:</p>
+                {/* Status pills - Compact */}
+                <div className="flex gap-1.5 flex-wrap pt-2 border-t border-slate-100 items-center">
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider mr-1">Status:</span>
                     {STATUSES.map(s => (
-                        <button key={s} onClick={() => setStatusFilter(s)}
-                            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border-2 ${statusFilter === s
-                                ? 'bg-indigo-600 border-indigo-600 text-white shadow-md'
-                                : 'bg-white border-slate-100 text-slate-400 hover:border-indigo-100 hover:text-indigo-600'
-                                }`}>
+                        <button
+                            key={s}
+                            onClick={() => setStatusFilter(s)}
+                            className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all border ${statusFilter === s
+                                ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
+                                : 'bg-white border-slate-200 text-slate-500 hover:border-indigo-200 hover:text-indigo-600'
+                                }`}
+                        >
                             {s === 'all' ? 'All Flow' : STATUS_LABELS[s] || s}
                         </button>
                     ))}
                 </div>
             </div>
 
-            {/* ── Table ── */}
-            <div className="bg-white border border-slate-100 shadow-xl shadow-slate-200/20 rounded-[2rem] overflow-hidden">
+            {/* Notification / Feedback */}
+            {feedback && (
+                <div className={`p-3 rounded-xl border flex items-center justify-between text-xs font-bold animate-in slide-in-from-top-2 ${
+                    feedback.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-red-50 border-red-200 text-red-700'
+                }`}>
+                    <div className="flex items-center gap-2">
+                        {feedback.type === 'success' ? <Check size={16} /> : <AlertTriangle size={16} />}
+                        <span>{feedback.message}</span>
+                    </div>
+                    <button onClick={() => setFeedback(null)} className="p-1 hover:opacity-70"><X size={14} /></button>
+                </div>
+            )}
+
+            {/* ── Table (Zero Scrolling Optimized, Compact Height) ── */}
+            <div className="bg-white border border-slate-100 shadow-sm rounded-2xl overflow-hidden">
                 {loading ? (
-                    <div className="flex items-center justify-center h-64">
-                        <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                    <div className="flex items-center justify-center h-48">
+                        <div className="w-8 h-8 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin" />
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
-                        <table className="w-full text-left">
-                            <thead className="bg-slate-50/50">
+                        <table className="w-full text-left border-collapse">
+                            <thead className="bg-slate-50/60 border-b border-slate-100 text-[9px] font-black uppercase text-slate-400 tracking-wider">
                                 <tr>
-                                    {['Identification', 'Application Details', 'Payment Status', 'Current Flow', 'Actions'].map(h => (
-                                        <th key={h} className="px-6 py-5 text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] whitespace-nowrap">{h}</th>
-                                    ))}
+                                    <th className="py-2.5 px-3.5">Identification</th>
+                                    <th className="py-2.5 px-3">Applicant & Service</th>
+                                    <th className="py-2.5 px-3">Payment</th>
+                                    <th className="py-2.5 px-3">Flow Status</th>
+                                    <th className="py-2.5 px-3.5 text-right">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-50">
-                                {applications.map(app => (
-                                    <tr key={app._id} className="group hover:bg-slate-50/80 transition-all duration-300">
-                                        <td className="px-6 py-5 whitespace-nowrap">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 font-black text-xs">
-                                                    #{app.trackingId.slice(-4)}
+                            <tbody className="divide-y divide-slate-50 text-xs">
+                                {applications.map(app => {
+                                    const canDelete = app.status === 'completed' || app.status === 'rejected';
+                                    return (
+                                        <tr key={app._id} className="hover:bg-slate-50/60 transition-colors">
+                                            <td className="py-2.5 px-3.5 whitespace-nowrap">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="w-7 h-7 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600 font-mono font-black text-[10px]">
+                                                        #{app.trackingId?.slice(-4)}
+                                                    </span>
+                                                    <div>
+                                                        <p className="font-mono text-xs font-black text-slate-800">{app.trackingId}</p>
+                                                        <p className="text-slate-400 text-[9px] font-bold">{new Date(app.createdAt).toLocaleDateString('en-GB')}</p>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <p className="font-mono text-[11px] font-black text-slate-800 tracking-tighter">{app.trackingId}</p>
-                                                    <p className="text-slate-400 text-[9px] font-black uppercase tracking-widest mt-0.5">{new Date(app.createdAt).toLocaleDateString('en-GB')}</p>
+                                            </td>
+                                            <td className="py-2.5 px-3">
+                                                <p className="font-bold text-slate-900 text-xs leading-snug">{app.userDetails?.fullName}</p>
+                                                <p className="text-[10px] text-slate-500 font-semibold truncate max-w-[180px]">{app.serviceName}</p>
+                                            </td>
+                                            <td className="py-2.5 px-3 whitespace-nowrap">
+                                                <span className="font-black text-slate-800 text-xs">₹{app.paymentDetails?.amount || 0}</span>
+                                                <span className={`ml-1.5 text-[9px] font-black uppercase ${app.paymentDetails?.paymentStatus === 'Paid' ? 'text-emerald-600' : 'text-amber-500'}`}>
+                                                    ({app.paymentDetails?.paymentStatus || 'Incomplete'})
+                                                </span>
+                                            </td>
+                                            <td className="py-2.5 px-3 whitespace-nowrap">
+                                                <span className={`px-2.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider border inline-flex items-center gap-1.5 ${STATUS_STYLES[app.status] || 'bg-slate-50 text-slate-400 border-slate-200'}`}>
+                                                    <span className={`w-1.5 h-1.5 rounded-full ${app.status === 'completed' ? 'bg-emerald-500' : 'bg-current'}`} />
+                                                    {STATUS_LABELS[app.status] || app.status}
+                                                </span>
+                                            </td>
+                                            <td className="py-2.5 px-3.5 text-right whitespace-nowrap">
+                                                <div className="inline-flex items-center gap-1.5">
+                                                    <button
+                                                        onClick={() => { setSelected(app); setStatusNote(app.rejectionReason || ''); }}
+                                                        className="px-3 py-1 bg-slate-800 hover:bg-indigo-600 text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-all shadow-sm active:scale-95"
+                                                    >
+                                                        Review Focus
+                                                    </button>
+                                                    {canDelete && (
+                                                        <button
+                                                            onClick={() => openDeleteAppModal(app)}
+                                                            className="p-1 bg-red-50 hover:bg-red-600 text-red-500 hover:text-white rounded-lg transition-all"
+                                                            title="Delete Application"
+                                                        >
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    )}
                                                 </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-5">
-                                            <div className="flex flex-col">
-                                                <p className="font-black text-slate-800 text-xs uppercase tracking-tight">{app.serviceName}</p>
-                                                <div className="flex items-center gap-1.5 mt-1">
-                                                    <span className="w-1.5 h-1.5 rounded-full bg-slate-300" />
-                                                    <p className="text-slate-500 text-[11px] font-bold">{app.userDetails?.fullName}</p>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-5">
-                                            <div className="flex items-center gap-3">
-                                                <div className={`p-2 rounded-xl border ${app.paymentDetails?.paymentStatus === 'Paid' ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-amber-50 border-amber-100 text-amber-600'}`}>
-                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" /></svg>
-                                                </div>
-                                                <div>
-                                                    <p className="font-black text-slate-800 text-xs">₹{app.paymentDetails?.amount || 0}</p>
-                                                    <p className={`text-[9px] font-black uppercase tracking-widest mt-0.5 ${app.paymentDetails?.paymentStatus === 'Paid' ? 'text-emerald-500' : 'text-amber-500'}`}>
-                                                        {app.paymentDetails?.paymentStatus || 'Incomplete'}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-5">
-                                            <span className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border-2 inline-flex items-center gap-2 ${STATUS_STYLES[app.status] || 'bg-slate-50 text-slate-400 border-slate-100'}`}>
-                                                <span className={`w-1.5 h-1.5 rounded-full ${app.status === 'completed' ? 'bg-emerald-500' : 'bg-current animate-pulse'}`} />
-                                                {STATUS_LABELS[app.status] || app.status}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-5">
-                                            <button onClick={() => { setSelected(app); setStatusNote(app.rejectionReason || ''); }}
-                                                className="px-5 py-2.5 bg-slate-800 hover:bg-black text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-black/5 active:scale-95 group-hover:bg-indigo-600 group-hover:shadow-indigo-500/20">
-                                                Review Focus
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                                 {applications.length === 0 && (
                                     <tr>
-                                        <td colSpan={5} className="text-center py-20 px-6">
-                                            <div className="flex flex-col items-center opacity-30">
-                                                <svg className="mb-4" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" /></svg>
-                                                <span className="font-black uppercase tracking-[0.3em] text-xs">No entries found for current filter</span>
-                                            </div>
+                                        <td colSpan={5} className="text-center py-12 px-4 text-slate-400 font-bold text-xs">
+                                            No entries found for current filter.
                                         </td>
                                     </tr>
                                 )}
@@ -298,21 +378,27 @@ const ApplicationsManager: React.FC = () => {
                 )}
             </div>
 
-            {/* ── Pagination ── */}
+            {/* ── Pagination (Compact) ── */}
             {(pagination.pages > 1 || pagination.total > 0) && (
-                <div className="flex items-center justify-between">
-                    <p className="text-slate-500 text-xs font-bold">Showing {applications.length} of {pagination.total} applications</p>
+                <div className="flex items-center justify-between text-xs px-1">
+                    <p className="text-slate-500 text-[11px] font-semibold">Showing {applications.length} of {pagination.total} entries</p>
                     {pagination.pages > 1 && (
-                        <div className="flex gap-2">
-                            <button disabled={pagination.page <= 1} onClick={() => fetchApps(pagination.page - 1)}
-                                className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-black text-slate-500 disabled:opacity-40 hover:bg-slate-50 transition-colors">
+                        <div className="flex gap-1.5">
+                            <button
+                                disabled={pagination.page <= 1}
+                                onClick={() => fetchApps(pagination.page - 1)}
+                                className="px-2.5 py-1 border border-slate-200 rounded-lg text-[11px] font-bold text-slate-600 disabled:opacity-40 hover:bg-slate-50"
+                            >
                                 ← Prev
                             </button>
-                            <span className="px-3 py-1.5 bg-blue-50 border border-blue-100 rounded-lg text-xs font-black text-blue-600">
+                            <span className="px-2.5 py-1 bg-blue-50 border border-blue-100 rounded-lg text-[11px] font-bold text-blue-600">
                                 {pagination.page} / {pagination.pages}
                             </span>
-                            <button disabled={pagination.page >= pagination.pages} onClick={() => fetchApps(pagination.page + 1)}
-                                className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-black text-slate-500 disabled:opacity-40 hover:bg-slate-50 transition-colors">
+                            <button
+                                disabled={pagination.page >= pagination.pages}
+                                onClick={() => fetchApps(pagination.page + 1)}
+                                className="px-2.5 py-1 border border-slate-200 rounded-lg text-[11px] font-bold text-slate-600 disabled:opacity-40 hover:bg-slate-50"
+                            >
                                 Next →
                             </button>
                         </div>
@@ -320,187 +406,183 @@ const ApplicationsManager: React.FC = () => {
                 </div>
             )}
 
-            {/* ── Review Modal ── */}
+            {/* ── Review Focus Modal ── */}
             {selected && (
-                <div className="fixed inset-0 z-[200] bg-slate-900/40 backdrop-blur-md flex items-center justify-center p-4"
-                    onClick={e => { if (e.target === e.currentTarget) setSelected(null); }}>
-                    <div className="bg-white border border-slate-100 shadow-2xl rounded-[2.5rem] w-full max-w-[1200px] mx-auto h-[85vh] overflow-y-auto flex flex-col animate-in zoom-in-95 duration-300">
+                <div
+                    className="fixed inset-0 z-[200] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
+                    onClick={e => { if (e.target === e.currentTarget) setSelected(null); }}
+                >
+                    <div className="bg-white border border-slate-100 shadow-2xl rounded-2xl w-full max-w-[1000px] mx-auto max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
                         {/* Modal Header */}
-                        <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-20">
+                        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                             <div>
-                                <h2 className="text-xl font-black text-slate-800 tracking-tight uppercase">Detailed Application Review</h2>
-                                <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mt-1 flex items-center gap-2">
-                                    <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse" />
-                                    Internal Admin Focus Mode
-                                </p>
+                                <div className="flex items-center gap-2">
+                                    <h2 className="text-base font-black text-slate-900 uppercase">Application Review</h2>
+                                    <span className="font-mono font-black text-indigo-600 text-xs bg-indigo-50 px-2 py-0.5 rounded-md">#{selected.trackingId}</span>
+                                </div>
+                                <p className="text-slate-400 text-[10px] font-bold mt-0.5">{selected.serviceName}</p>
                             </div>
-                            <button onClick={() => setSelected(null)}
-                                className="p-3 rounded-2xl bg-slate-50 hover:bg-red-50 hover:text-red-500 text-slate-400 transition-all active:scale-90">
-                                <X className="w-6 h-6" />
-                            </button>
+                            <div className="flex items-center gap-2">
+                                {(selected.status === 'completed' || selected.status === 'rejected') && (
+                                    <button
+                                        onClick={() => openDeleteAppModal(selected)}
+                                        className="px-3 py-1.5 bg-red-50 hover:bg-red-600 text-red-600 hover:text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm"
+                                        title="Delete this Application"
+                                    >
+                                        <Trash2 className="w-3.5 h-3.5" /> Delete
+                                    </button>
+                                )}
+                                <button
+                                    onClick={() => setSelected(null)}
+                                    className="p-1.5 rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-slate-700 transition-all"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-8 space-y-8">
-                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                                {/* Left Column: Info */}
-                                <div className="lg:col-span-8 space-y-8">
-                                    {/* ── Applicant ── */}
-                                    <section>
-                                        <div className="flex items-center gap-3 mb-4">
-                                            <span className="w-1.5 h-4 bg-indigo-600 rounded-full" />
-                                            <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">Applicant Profile</h3>
-                                        </div>
-                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                        {/* Modal Body */}
+                        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                                {/* Left Column: Info & Documents */}
+                                <div className="lg:col-span-8 space-y-5">
+                                    {/* Applicant Details */}
+                                    <div>
+                                        <h3 className="font-black text-slate-700 text-xs uppercase tracking-wider mb-2.5">Applicant Information</h3>
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                                             {[
                                                 ['Full Name', selected.userDetails?.fullName],
                                                 ['Mobile', selected.userDetails?.mobile],
-                                                ['Email', selected.userDetails?.email || 'NOT_PROVIDED'],
-                                                ['Service', selected.serviceName],
+                                                ['Email', selected.userDetails?.email || 'N/A'],
                                                 ['City', selected.userDetails?.city],
                                                 ['State', selected.userDetails?.state],
+                                                ['Pincode', selected.userDetails?.pincode],
                                             ].map(([k, v]) => (
-                                                <div key={k} className="bg-slate-50/50 border border-slate-100 rounded-2xl p-4 group hover:bg-white hover:border-indigo-100 transition-all">
-                                                    <p className="text-slate-400 text-[9px] font-black uppercase tracking-widest leading-none mb-2">{k}</p>
-                                                    <p className="text-slate-800 font-bold text-xs truncate uppercase tracking-tight">{v || '—'}</p>
+                                                <div key={k} className="bg-slate-50 border border-slate-100 rounded-xl p-2.5">
+                                                    <p className="text-slate-400 text-[9px] font-black uppercase tracking-wider">{k}</p>
+                                                    <p className="text-slate-800 font-bold text-xs truncate mt-0.5">{v || '—'}</p>
                                                 </div>
                                             ))}
-                                            <div className="bg-slate-50/50 border border-slate-100 rounded-2xl p-4 col-span-2 group hover:bg-white hover:border-indigo-100 transition-all">
-                                                <p className="text-slate-400 text-[9px] font-black uppercase tracking-widest mb-2">Detailed Address</p>
-                                                <p className="text-slate-800 font-bold text-xs uppercase tracking-tight">{selected.userDetails?.address || '—'}</p>
+                                            <div className="bg-slate-50 border border-slate-100 rounded-xl p-2.5 col-span-2 sm:col-span-3">
+                                                <p className="text-slate-400 text-[9px] font-black uppercase tracking-wider">Address</p>
+                                                <p className="text-slate-800 font-bold text-xs mt-0.5">{selected.userDetails?.address || '—'}</p>
                                             </div>
                                         </div>
-                                    </section>
+                                    </div>
 
-                                    {/* ── Documents ── */}
-                                    {selected.documents?.length > 0 && (
-                                        <section>
-                                            <div className="flex items-center gap-3 mb-4">
-                                                <span className="w-1.5 h-4 bg-emerald-500 rounded-full" />
-                                                <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">Digital Assets ({selected.documents.length})</h3>
-                                            </div>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                {selected.documents.map((doc: any, i: number) => (
-                                                    <div key={i} className="flex items-center justify-between bg-white border border-slate-100 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all group overflow-hidden">
-                                                        <div className="min-w-0 pr-4">
-                                                            <p className="text-slate-800 text-xs font-black truncate uppercase tracking-tight mb-1">{doc.docType}</p>
-                                                            <p className="text-slate-400 text-[9px] font-bold truncate opacity-60">{doc.originalName || doc.fileName}</p>
-                                                        </div>
-                                                        <div className="flex items-center gap-2 flex-shrink-0">
-                                                            <button
-                                                                onClick={() => previewDocument(selected._id, i)}
-                                                                className="p-3 bg-emerald-50 group-hover:bg-emerald-600 text-emerald-600 group-hover:text-white rounded-xl transition-all active:scale-90"
-                                                                title="View Document"
-                                                            >
-                                                                <Eye className="w-4 h-4" />
-                                                            </button>
-                                                            <button
-                                                                onClick={() => downloadDocument(selected._id, i, doc.originalName || doc.fileName || `document_${i}`)}
-                                                                disabled={downloadingDoc === i}
-                                                                className="p-3 bg-indigo-50 group-hover:bg-indigo-600 text-indigo-600 group-hover:text-white rounded-xl transition-all active:scale-90 disabled:opacity-50"
-                                                                title="Download Document"
-                                                            >
-                                                                {downloadingDoc === i ? <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" /> : <Download className="w-4 h-4" />}
-                                                            </button>
-                                                        </div>
+                                    {/* Service Specific Fields if any */}
+                                    {selected.serviceSpecificFields && Object.keys(selected.serviceSpecificFields).length > 0 && (
+                                        <div>
+                                            <h3 className="font-black text-slate-700 text-xs uppercase tracking-wider mb-2.5">Form Specific Data</h3>
+                                            <div className="grid grid-cols-2 gap-2.5">
+                                                {Object.entries(selected.serviceSpecificFields).map(([k, v]) => (
+                                                    <div key={k} className="bg-slate-50 border border-slate-100 rounded-xl p-2.5">
+                                                        <p className="text-slate-400 text-[9px] font-black uppercase tracking-wider">{k}</p>
+                                                        <p className="text-slate-800 font-bold text-xs truncate mt-0.5">{String(v || '—')}</p>
                                                     </div>
                                                 ))}
                                             </div>
-                                        </section>
+                                        </div>
                                     )}
 
-                                    {/* ── Status Management ── */}
-                                    <section className="bg-slate-50 rounded-[2rem] p-6 border border-slate-100">
-                                        <div className="flex items-center gap-3 mb-5">
-                                            <span className="w-1.5 h-4 bg-red-500 rounded-full" />
-                                            <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest text-red-500">Flow Orchestration</h3>
+                                    {/* Documents List with Real Names */}
+                                    {selected.documents?.length > 0 && (
+                                        <div>
+                                            <h3 className="font-black text-slate-700 text-xs uppercase tracking-wider mb-2.5 flex items-center justify-between">
+                                                <span>Uploaded Documents ({selected.documents.length})</span>
+                                                <span className="text-[10px] text-emerald-600 font-bold">Original File Identifiers</span>
+                                            </h3>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                                {selected.documents.map((doc: any, i: number) => {
+                                                    const cleanDocName = getCleanDocName(doc, i);
+                                                    return (
+                                                        <div key={i} className="flex items-center justify-between bg-white border border-slate-200 rounded-xl p-3 shadow-xs hover:border-indigo-300 transition-all">
+                                                            <div className="min-w-0 pr-2">
+                                                                <p className="text-slate-900 text-xs font-black truncate uppercase tracking-tight">{cleanDocName}</p>
+                                                                <p className="text-slate-400 text-[10px] font-medium truncate mt-0.5">{doc.originalName || doc.fileName}</p>
+                                                            </div>
+                                                            <div className="flex items-center gap-1.5 flex-shrink-0">
+                                                                <button
+                                                                    onClick={() => previewDocument(selected._id, i)}
+                                                                    className="p-2 bg-emerald-50 hover:bg-emerald-600 text-emerald-600 hover:text-white rounded-lg transition-colors"
+                                                                    title="Preview Document"
+                                                                >
+                                                                    <Eye className="w-3.5 h-3.5" />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => downloadDocument(selected._id, i, doc.originalName || cleanDocName)}
+                                                                    disabled={downloadingDoc === i}
+                                                                    className="p-2 bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white rounded-lg transition-colors disabled:opacity-50"
+                                                                    title="Download Document"
+                                                                >
+                                                                    {downloadingDoc === i ? <div className="w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
                                         </div>
-                                        <div className="flex flex-wrap gap-2 mb-6">
+                                    )}
+                                </div>
+
+                                {/* Right Column: Status & Delivery */}
+                                <div className="lg:col-span-4 space-y-4">
+                                    {/* Payment Box */}
+                                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Payment Information</p>
+                                        <div className="flex items-baseline justify-between mt-1">
+                                            <span className="text-2xl font-black text-slate-900">₹{selected.paymentDetails?.amount || 0}</span>
+                                            <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${selected.paymentDetails?.paymentStatus === 'Paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                                                {selected.paymentDetails?.paymentStatus || 'UNPAID'}
+                                            </span>
+                                        </div>
+                                        <p className="text-[10px] font-mono text-slate-500 mt-2 truncate">Tx: {selected.paymentDetails?.transactionId || 'N/A'}</p>
+                                    </div>
+
+                                    {/* Status Updater */}
+                                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
+                                        <p className="text-[10px] font-black text-slate-600 uppercase tracking-wider">Change Application Status</p>
+                                        <div className="grid grid-cols-2 gap-1.5">
                                             {['received', 'review', 'verifying', 'completed', 'rejected'].map(s => (
-                                                <button key={s} onClick={() => updateStatus(s)} disabled={updating}
-                                                    className={`px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border-2 transition-all disabled:opacity-50 ${selected.status === s
-                                                        ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-500/20'
-                                                        : 'bg-white border-slate-200 text-slate-400 hover:border-red-100 hover:text-red-500'
-                                                        }`}>
+                                                <button
+                                                    key={s}
+                                                    onClick={() => updateStatus(s)}
+                                                    disabled={updating}
+                                                    className={`py-2 px-2 rounded-xl text-[10px] font-black uppercase tracking-wider border transition-all ${selected.status === s
+                                                        ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
+                                                        : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'
+                                                        }`}
+                                                >
                                                     {STATUS_LABELS[s] || s}
                                                 </button>
                                             ))}
                                         </div>
-                                        <div className="relative group">
-                                            <textarea value={statusNote} onChange={e => setStatusNote(e.target.value)}
-                                                placeholder="Internal notes or rejection justification..."
-                                                className="w-full px-6 py-5 rounded-[1.5rem] bg-white border-2 border-slate-100 text-slate-800 placeholder:text-slate-300 text-sm font-bold outline-none focus:border-red-200 transition-all resize-none h-24 shadow-inner" />
-                                            {selected.status === 'rejected' && <p className="absolute -top-3 left-6 px-3 bg-red-600 text-white text-[9px] font-black uppercase tracking-widest rounded-full py-1">Required for rejection</p>}
-                                        </div>
-                                    </section>
-                                </div>
 
-                                {/* Right Column: Stats & Actions */}
-                                <div className="lg:col-span-4 space-y-8">
-                                    {/* ── Master Tracking ── */}
-                                    <div className="bg-indigo-600 rounded-[2rem] p-8 text-white shadow-xl shadow-indigo-500/20 relative overflow-hidden group">
-                                        <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:rotate-12 transition-transform duration-700">
-                                            <svg width="140" height="140" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" /></svg>
-                                        </div>
-                                        <p className="text-white/60 text-[10px] font-black uppercase tracking-[0.2em] mb-3">Enterprise UUID</p>
-                                        <p className="text-2xl font-black font-mono tracking-tighter mb-8 break-all">{selected.trackingId}</p>
-                                        <div className="flex gap-2">
-                                            <span className="w-2 h-2 rounded-full bg-white/40 animate-pulse" />
-                                            <span className="w-2 h-2 rounded-full bg-white/20" />
-                                            <span className="w-2 h-2 rounded-full bg-white/20" />
-                                        </div>
+                                        <textarea
+                                            value={statusNote}
+                                            onChange={e => setStatusNote(e.target.value)}
+                                            placeholder="Reason if rejecting or internal remarks..."
+                                            className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-semibold outline-none focus:border-indigo-400 h-16 resize-none"
+                                        />
                                     </div>
 
-                                    {/* ── Financial Summary ── */}
-                                    <div className="bg-white border-2 border-slate-100 rounded-[2rem] p-6 space-y-4">
-                                        <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest text-center">Treasury Link</p>
-                                        <div className="flex items-center justify-center gap-2">
-                                            <span className="text-4xl font-black text-slate-800 tracking-tighter">₹{selected.paymentDetails?.amount || 0}</span>
-                                            <div className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase ${selected.paymentDetails?.paymentStatus === 'Paid' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
-                                                {selected.paymentDetails?.paymentStatus || 'UNPAID'}
-                                            </div>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-2 text-center pt-2 border-t border-slate-50">
-                                            <div>
-                                                <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Gateway</p>
-                                                <p className="text-[11px] font-black text-slate-600 uppercase mt-0.5">{selected.paymentDetails?.method || 'CASH'}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Tx ID</p>
-                                                <p className="text-[11px] font-black text-slate-600 font-mono mt-0.5 truncate px-1">{selected.paymentDetails?.transactionId || 'INTERNAL'}</p>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* ── Final Output ── */}
-                                    <div className="bg-emerald-50 border-2 border-emerald-100/50 rounded-[2rem] p-6 text-center">
-                                        <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600 mb-6">Outcome Delivery</h4>
-
-                                        {selected.certificateUrl ? (
-                                            <div className="space-y-4">
-                                                <div className="w-16 h-16 bg-emerald-500 rounded-3xl flex items-center justify-center text-white mx-auto shadow-lg shadow-emerald-500/20">
-                                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" /></svg>
-                                                </div>
-                                                <a href={`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000'}${selected.certificateUrl}`}
-                                                    target="_blank" rel="noreferrer"
-                                                    className="block w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-[1.5rem] font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-600/20 transition-all active:scale-95">
-                                                    Sync Certificate
-                                                </a>
-                                            </div>
-                                        ) : (
-                                            <div className="space-y-4">
-                                                <div className="group relative w-full h-32 rounded-[1.5rem] bg-emerald-500/5 border-2 border-dashed border-emerald-200 flex flex-col items-center justify-center hover:bg-emerald-500/10 transition-all cursor-pointer overflow-hidden"
-                                                    onClick={() => (document.getElementById('c-up') as any).click()}>
-                                                    <svg className="mb-2 text-emerald-600" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4m4-7l5-5 5 5m-5-5v12" /></svg>
-                                                    <p className="text-[10px] font-black uppercase text-emerald-600 tracking-widest">
-                                                        {certFile ? certFile.name : 'Attach Certificate'}
-                                                    </p>
-                                                    <input id="c-up" type="file" className="hidden" onChange={e => setCertFile(e.target.files?.[0] || null)} />
-                                                </div>
-                                                <button onClick={uploadCertificate} disabled={!certFile || updating}
-                                                    className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-[1.5rem] font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-600/20 disabled:opacity-40 transition-all active:scale-95">
-                                                    Deploy Result
-                                                </button>
-                                            </div>
+                                    {/* Delivery Certificate Upload */}
+                                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2">
+                                        <p className="text-[10px] font-black text-slate-600 uppercase tracking-wider">Upload Completed Certificate</p>
+                                        <input
+                                            type="file"
+                                            onChange={e => setCertFile(e.target.files?.[0] || null)}
+                                            className="w-full text-xs text-slate-500 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-[10px] file:font-black file:bg-indigo-50 file:text-indigo-600 hover:file:bg-indigo-100"
+                                        />
+                                        {certFile && (
+                                            <button
+                                                onClick={uploadCertificate}
+                                                disabled={updating}
+                                                className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all"
+                                            >
+                                                Upload Certificate
+                                            </button>
                                         )}
                                     </div>
                                 </div>
@@ -511,56 +593,107 @@ const ApplicationsManager: React.FC = () => {
             )}
 
             {/* ── Document Preview Modal ── */}
-            {previewDocIndex !== null && selected && (
-                <div className="fixed inset-0 z-[300] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4"
-                    onClick={e => { if (e.target === e.currentTarget) closePreview(); }}>
-                    <div className="bg-white border border-slate-100 shadow-2xl rounded-[2rem] w-full max-w-4xl mx-auto h-[80vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
-                        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white flex-shrink-0">
-                            <div>
-                                <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">
-                                    {selected.documents[previewDocIndex]?.docType || 'Document'} Preview
-                                </h3>
-                                <p className="text-slate-400 text-[9px] font-bold uppercase tracking-widest mt-0.5">
-                                    {selected.documents[previewDocIndex]?.originalName || selected.documents[previewDocIndex]?.fileName}
-                                </p>
-                            </div>
+            {previewUrl && (
+                <div
+                    className="fixed inset-0 z-[300] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
+                    onClick={closePreview}
+                >
+                    <div
+                        className="bg-white rounded-2xl max-w-3xl w-full max-h-[85vh] overflow-hidden flex flex-col shadow-2xl animate-in zoom-in-95 duration-200"
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                            <span className="text-xs font-black uppercase text-slate-800">
+                                {selected?.documents?.[previewDocIndex || 0] ? getCleanDocName(selected.documents[previewDocIndex || 0], previewDocIndex || 0) : 'Document'} Preview
+                            </span>
                             <div className="flex items-center gap-2">
-                                <button onClick={downloadFromPreview}
-                                    className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-lg shadow-indigo-500/20">
-                                    <Download className="w-3.5 h-3.5" /> Download
+                                <button
+                                    onClick={downloadFromPreview}
+                                    className="p-1.5 bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white rounded-lg transition-colors"
+                                    title="Download"
+                                >
+                                    <Download size={16} />
                                 </button>
-                                <button onClick={closePreview}
-                                    className="p-2.5 rounded-xl bg-slate-50 hover:bg-red-50 hover:text-red-500 text-slate-400 transition-all active:scale-90">
-                                    <X className="w-5 h-5" />
+                                <button
+                                    onClick={closePreview}
+                                    className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600"
+                                >
+                                    <X size={16} />
                                 </button>
                             </div>
                         </div>
-                        <div className="flex-1 overflow-auto bg-slate-50 p-4 flex items-center justify-center">
+                        <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-slate-900/5">
                             {previewLoading ? (
-                                <div className="flex flex-col items-center gap-3">
-                                    <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-                                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Loading Preview...</p>
+                                <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+                            ) : (
+                                <iframe src={previewUrl} className="w-full h-[65vh] rounded-xl border border-slate-200" title="Preview" />
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Strict Confirmation Delete Application Modal ── */}
+            {deleteModalOpen && deletingTarget && (
+                <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-red-50/50">
+                            <div className="flex items-center gap-2.5 text-red-600">
+                                <div className="p-2 bg-red-100 rounded-xl">
+                                    <AlertTriangle size={18} />
                                 </div>
-                            ) : previewUrl ? (
-                                (() => {
-                                    const doc = selected.documents[previewDocIndex];
-                                    const mime = doc?.mimeType || '';
-                                    const name = (doc?.originalName || doc?.fileName || '').toLowerCase();
-                                    if (mime.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/.test(name)) {
-                                        return <img src={previewUrl} alt="Document Preview" className="max-w-full max-h-full object-contain rounded-xl shadow-lg" />;
-                                    } else if (mime === 'application/pdf' || name.endsWith('.pdf')) {
-                                        return <iframe src={previewUrl} className="w-full h-full rounded-xl border-0" title="PDF Preview" />;
-                                    } else {
-                                        return (
-                                            <div className="text-center">
-                                                <svg className="mx-auto mb-4 text-slate-300" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
-                                                <p className="text-sm font-black text-slate-500 uppercase tracking-widest">Preview not available for this file type</p>
-                                                <p className="text-xs text-slate-400 mt-2">Use the download button to view this file.</p>
-                                            </div>
-                                        );
-                                    }
-                                })()
-                            ) : null}
+                                <div>
+                                    <h3 className="text-sm font-black text-slate-900 uppercase">Delete Application</h3>
+                                    <p className="text-[10px] text-slate-500 font-bold">Permanent removal of application & records</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => { setDeleteModalOpen(false); setDeletingTarget(null); }}
+                                className="p-1.5 hover:bg-white rounded-lg text-slate-400 hover:text-slate-600 transition-colors"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <div className="p-5 space-y-4">
+                            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs space-y-1">
+                                <p className="text-slate-500 font-medium">Tracking ID: <span className="font-mono font-black text-indigo-600">#{deletingTarget.trackingId}</span></p>
+                                <p className="text-slate-500 font-medium">Applicant: <span className="font-bold text-slate-800">{deletingTarget.userDetails?.fullName}</span></p>
+                                <p className="text-slate-500 font-medium">Service: <span className="font-bold text-slate-800">{deletingTarget.serviceName}</span></p>
+                                <p className="text-slate-500 font-medium">Status: <span className="font-bold text-red-600 uppercase">{deletingTarget.status}</span></p>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">
+                                    Type <span className="text-red-600 font-mono font-black">DELETE</span> to confirm:
+                                </label>
+                                <input
+                                    type="text"
+                                    value={deleteConfirmText}
+                                    onChange={e => setDeleteConfirmText(e.target.value)}
+                                    placeholder="Type DELETE"
+                                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold outline-none focus:ring-2 focus:ring-red-500/10 focus:border-red-400 transition-all text-center tracking-widest uppercase placeholder:normal-case placeholder:tracking-normal"
+                                />
+                            </div>
+
+                            <div className="flex items-center gap-2 pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => { setDeleteModalOpen(false); setDeletingTarget(null); }}
+                                    className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-black transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    disabled={deleteConfirmText.trim().toUpperCase() !== 'DELETE' || deleting}
+                                    onClick={handleConfirmDeleteApp}
+                                    className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-40 disabled:hover:bg-red-600 text-white rounded-xl text-xs font-black transition-all shadow-md flex items-center justify-center gap-1.5"
+                                >
+                                    {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                                    Permanent Delete
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

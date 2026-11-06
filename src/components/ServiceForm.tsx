@@ -170,7 +170,15 @@ const ServiceForm: React.FC<ServiceFormProps> = ({
             alert(`Please upload: ${missing.join(', ')}`);
             return;
         }
-        onComplete(collectedDetails, uploadedFiles.map(f => f.file), collectedSpecific);
+        onComplete(
+            collectedDetails,
+            uploadedFiles.map(f => {
+                const fl = f.file;
+                (fl as any).docType = f.docType;
+                return fl;
+            }),
+            collectedSpecific
+        );
     };
 
     const uploadedCount = uploadedFiles.filter(f => requiredDocs.includes(f.docType)).length;

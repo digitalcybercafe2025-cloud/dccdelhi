@@ -357,8 +357,80 @@ const downloadCertificate = async (req, res) => {
     }
 };
 
+
+// @desc    Delete application permanently
+// @route   DELETE /api/applications/:id
+// @access  Private/Admin
+const deleteApplication = async (req, res) => {
+    try {
+        const application = await Application.findById(req.params.id);
+        if (!application) {
+            return res.status(404).json({ success: false, message: 'Application not found' });
+        }
+
+        // Clean up files on disk if any exist
+        if (application.documents && application.documents.length > 0) {
+            application.documents.forEach(doc => {
+                if (doc.filePath) {
+                    const fullPath = path.join(__dirname, '..', doc.filePath);
+                    if (fs.existsSync(fullPath)) {
+                        try { fs.unlinkSync(fullPath); } catch (e) {}
+                    }
+                }
+            });
+        }
+
+        if (application.certificateUrl && application.certificateUrl.startsWith('uploads/')) {
+            const certPath = path.join(__dirname, '..', application.certificateUrl);
+            if (fs.existsSync(certPath)) {
+                try { fs.unlinkSync(certPath); } catch (e) {}
+            }
+        }
+
+        await application.deleteOne();
+        res.json({ success: true, message: 'Application deleted permanently' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// @desc    Delete single document from application
+// @route   DELETE /api/applications/:id/documents/:docIndex
+// @access  Private/Admin
+const deleteApplicationDocument = async (req, res) => {
+    try {
+        const { id, docIndex } = req.params;
+        const application = await Application.findById(id);
+        if (!application) {
+            return res.status(404).json({ success: false, message: 'Application not found' });
+        }
+
+        const index = parseInt(docIndex, 10);
+        if (isNaN(index) || index < 0 || index >= application.documents.length) {
+            return res.status(400).json({ success: false, message: 'Invalid document index' });
+        }
+
+        const docToDelete = application.documents[index];
+        if (docToDelete && docToDelete.filePath) {
+            const fullPath = path.join(__dirname, '..', docToDelete.filePath);
+            if (fs.existsSync(fullPath)) {
+                try { fs.unlinkSync(fullPath); } catch (e) {}
+            }
+        }
+
+        application.documents.splice(index, 1);
+        await application.save();
+
+        res.json({ success: true, message: 'Document deleted successfully', data: application.documents });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
 module.exports = {
     createApplication,
+    deleteApplication,
+    deleteApplicationDocument,
     trackApplication,
     getApplications,
     updateApplicationStatus,
