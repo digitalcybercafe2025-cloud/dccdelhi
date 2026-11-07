@@ -10,22 +10,26 @@ interface HeroProps {
   slides?: any[];
 }
 
+const hasValidText = (val: any): boolean => {
+  return typeof val === 'string' && val.trim().length > 0;
+};
+
 export const Hero: React.FC<HeroProps> = ({ messages = [], slides = [] }) => {
   const [activeSlide, setActiveSlide] = useState(0);
   const [activeMessageIndex, setActiveMessageIndex] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
 
-  const displaySlides = slides.length > 0 ? slides : CAROUSEL_IMAGES.map(img => ({
+  const displaySlides = Array.isArray(slides) && slides.length > 0 ? slides : CAROUSEL_IMAGES.map(img => ({
     image: img,
     title: 'Gateway to Secure Digital Seva.',
     subtitle: 'Advanced processing for government and academic documentation with end-to-end security.',
     badge: 'Official Gateway'
   }));
 
-  const allActiveMessages = messages
-    .filter(m => m.status !== false)
-    .sort((a, b) => (a.order || 0) - (b.order || 0));
+  const allActiveMessages = (Array.isArray(messages) ? messages : [])
+    .filter(m => m && typeof m === 'object' && m.status !== false)
+    .sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
 
   const safeMessageIndex = activeMessageIndex % Math.max(1, allActiveMessages.length);
   const displayMessages = allActiveMessages.length <= 2
@@ -64,8 +68,8 @@ export const Hero: React.FC<HeroProps> = ({ messages = [], slides = [] }) => {
     return () => clearInterval(timer);
   }, [displaySlides.length]);
 
-  const renderHighlightedText = (text: string) => {
-    if (!text) return null;
+  const renderHighlightedText = (text: any) => {
+    if (!text || typeof text !== 'string') return text || null;
     const parts = text.split(/(\[.*?\]|\[\/.*?\])/);
     let currentColorClass = '';
 
@@ -112,26 +116,26 @@ export const Hero: React.FC<HeroProps> = ({ messages = [], slides = [] }) => {
                     className="w-full h-full object-contain brightness-[1.02]"
                   />
                   {/* Multi-stop light overlay for better text blending - only rendered if title, subtitle, or button is present */}
-                  {(Boolean(slide.title?.trim() || slide.subtitle?.trim() || slide.buttonText?.trim())) && (
+                  {(hasValidText(slide.title) || hasValidText(slide.subtitle) || hasValidText(slide.buttonText)) && (
                     <div className="absolute inset-0 bg-gradient-to-t from-white via-white/60 via-white/10 to-transparent dark:from-slate-950 dark:via-slate-900/60 dark:to-transparent flex items-end p-5 md:p-10 lg:p-12 pointer-events-none">
                       <div className="text-slate-900 dark:text-white max-w-2xl animate-in slide-in-from-bottom-8 duration-1000 pointer-events-auto">
-                        {Boolean(slide.badge?.trim()) && (
+                        {hasValidText(slide.badge) && (
                           <div className="flex items-center gap-4 mb-3 md:mb-5 bg-brand/5 dark:bg-white/10 backdrop-blur-3xl w-fit px-4 py-2 rounded-2xl border border-brand/10 dark:border-white/10 shadow-sm">
                             <ShieldCheck className="w-3.5 md:w-4 h-3.5 md:h-4 text-brand dark:text-emerald-400 verified-badge-glow" />
                             <span className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] md:tracking-[0.3em] text-brand dark:text-white">{slide.badge}</span>
                           </div>
                         )}
-                        {Boolean(slide.title?.trim()) && (
+                        {hasValidText(slide.title) && (
                           <h2 className="text-3xl md:text-4xl lg:text-5xl font-black mb-3 md:mb-4 tracking-tighter leading-[1.1] md:leading-[1] text-brand dark:text-white">
                             {renderHighlightedText(slide.title)}
                           </h2>
                         )}
-                        {Boolean(slide.subtitle?.trim()) && (
+                        {hasValidText(slide.subtitle) && (
                           <p className="text-slate-600 dark:text-slate-300 text-xs md:text-sm lg:text-base font-bold leading-relaxed opacity-90 max-w-lg">
                             {slide.subtitle}
                           </p>
                         )}
-                        {Boolean(slide.buttonText?.trim()) && (
+                        {hasValidText(slide.buttonText) && (
                           <a href={slide.buttonLink || '#'} className="mt-5 inline-flex items-center gap-2 px-6 py-3 bg-brand text-white rounded-xl font-black text-xs hover:opacity-90 transition-all">
                             {slide.buttonText} <ChevronRight size={14} />
                           </a>

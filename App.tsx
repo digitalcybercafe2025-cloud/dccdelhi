@@ -64,8 +64,12 @@ const App: React.FC = () => {
   }, [themeColor]);
 
   useEffect(() => {
-    const savedAbout = localStorage.getItem('mangolpuri_cms_about');
-    if (savedAbout) setAboutContent(JSON.parse(savedAbout));
+    try {
+      const savedAbout = localStorage.getItem('mangolpuri_cms_about');
+      if (savedAbout) setAboutContent(JSON.parse(savedAbout));
+    } catch (e) {
+      console.warn('Failed to parse saved about', e);
+    }
   }, []);
 
   useEffect(() => {
@@ -84,12 +88,6 @@ const App: React.FC = () => {
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     };
-  }, []);
-
-
-  useEffect(() => {
-    const savedAbout = localStorage.getItem('mangolpuri_cms_about');
-    if (savedAbout) setAboutContent(JSON.parse(savedAbout));
   }, []);
 
   const handleSendEnquiry = async (data: Omit<Enquiry, 'id' | 'timestamp' | 'isRead' | 'status'>) => {

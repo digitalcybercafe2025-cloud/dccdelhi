@@ -2,6 +2,7 @@
 import React from 'react';
 import { Service } from '../types';
 import { ArrowRight, ShieldCheck } from 'lucide-react';
+import { getMediaUrl } from '../src/api/axios';
 
 interface ServiceCardProps {
   service: Service;
@@ -44,7 +45,7 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({ service, onApply }) =>
       {/* ── Top Image ── */}
       <div className="relative h-28 md:h-40 p-1 md:p-2 overflow-hidden shrink-0">
         <img
-          src={service.image?.startsWith('/') ? `http://${window.location.hostname}:5000${service.image}` : service.image}
+          src={getMediaUrl(service.image)}
           alt={service.title}
           className="w-full h-full object-cover rounded-xl transition-transform duration-500 group-hover:scale-105"
           onError={e => (e.currentTarget.src = 'https://placehold.co/400x200/f8fafc/94a3b8?text=Load+Error')}

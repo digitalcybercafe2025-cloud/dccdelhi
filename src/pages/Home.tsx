@@ -5,48 +5,52 @@ import { ServiceCard } from '../../components/ServiceCard';
 import { TestimonialSection } from '../../components/TestimonialSection';
 import { ChevronRight } from 'lucide-react';
 import { Service, Message, Testimonial } from '../../types';
-import { MESSAGES, TESTIMONIALS } from '../../constants';
-
-
+import { SERVICES, MESSAGES, TESTIMONIALS } from '../../constants';
 
 import { Link } from 'react-router-dom';
 import api from '../api/axios';
 
 export const Home: React.FC = () => {
     const navigate = useNavigate();
-    const [services, setServices] = useState<Service[]>([]);
-    const [messages, setMessages] = useState<Message[]>([]);
+    const [services, setServices] = useState<Service[]>(() => SERVICES.slice(0, 8));
+    const [messages, setMessages] = useState<Message[]>(() => MESSAGES);
     const [slides, setSlides] = useState<any[]>([]);
-    const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
+    const [testimonials, setTestimonials] = useState<Testimonial[]>(() => TESTIMONIALS);
 
     useEffect(() => {
         const fetchHomeData = async () => {
             try {
-                const [svcRes, testRes, slideRes, noticeRes] = await Promise.all([
+                const [svcRes, testRes, slideRes, noticeRes] = await Promise.allSettled([
                     api.get('/services'),
                     api.get('/testimonials'),
                     api.get('/hero/slides/active'),
                     api.get('/hero/notices/active')
                 ]);
 
-                if (svcRes.data.success) setServices(svcRes.data.data.slice(0, 8));
+                if (svcRes.status === 'fulfilled' && svcRes.value?.data?.success && Array.isArray(svcRes.value.data.data)) {
+                    setServices(svcRes.value.data.data.slice(0, 8));
+                }
 
-                if (testRes.data.success) {
-                    const mapped = testRes.data.data.map((t: any) => ({
+                if (testRes.status === 'fulfilled' && testRes.value?.data?.success && Array.isArray(testRes.value.data.data) && testRes.value.data.data.length > 0) {
+                    const mapped = testRes.value.data.data.map((t: any) => ({
                         id: t._id,
-                        name: t.name,
-                        comment: t.message,
-                        rating: t.rating,
-                        designation: t.role,
-                        photo_url: t.image,
-                        status: t.active,
-                        display_order: t.order
+                        name: t.name || 'Customer',
+                        comment: t.message || '',
+                        rating: t.rating || 5,
+                        designation: t.role || 'Citizen',
+                        photo_url: t.image || '',
+                        status: t.active !== false,
+                        display_order: t.order || 0
                     }));
                     setTestimonials(mapped);
                 }
 
-                if (slideRes.data.success) setSlides(slideRes.data.data);
-                if (noticeRes.data.success) setMessages(noticeRes.data.data);
+                if (slideRes.status === 'fulfilled' && slideRes.value?.data?.success && Array.isArray(slideRes.value.data.data) && slideRes.value.data.data.length > 0) {
+                    setSlides(slideRes.value.data.data);
+                }
+                if (noticeRes.status === 'fulfilled' && noticeRes.value?.data?.success && Array.isArray(noticeRes.value.data.data) && noticeRes.value.data.data.length > 0) {
+                    setMessages(noticeRes.value.data.data);
+                }
             } catch (error) {
                 console.error("Failed to fetch home data", error);
             }

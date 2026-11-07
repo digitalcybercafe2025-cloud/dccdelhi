@@ -41,15 +41,27 @@ const INITIAL_MESSAGES: ChatMessage[] = [
 export const Chatbot: React.FC<ChatbotProps> = ({ applications }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
-    const saved = sessionStorage.getItem('mangolpuri_chat_history');
-    return saved ? JSON.parse(saved) : INITIAL_MESSAGES;
+    try {
+      const saved = sessionStorage.getItem('mangolpuri_chat_history');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {
+      console.warn('Could not read chat history', e);
+    }
+    return INITIAL_MESSAGES;
   });
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    sessionStorage.setItem('mangolpuri_chat_history', JSON.stringify(messages));
+    try {
+      sessionStorage.setItem('mangolpuri_chat_history', JSON.stringify(messages));
+    } catch (e) {
+      console.warn('Could not save chat history', e);
+    }
     if (scrollRef.current) {
       scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
     }
