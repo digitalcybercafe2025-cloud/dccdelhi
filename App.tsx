@@ -74,7 +74,11 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(err => console.error('SW registration failed', err));
+      navigator.serviceWorker.register('/sw.js')
+        .then(registration => {
+          registration.update();
+        })
+        .catch(err => console.error('SW registration failed', err));
     }
 
     const handleBeforeInstallPrompt = (e: any) => {
