@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Loader2, CheckCircle, Smartphone, CreditCard, Banknote, Shield, Lock, Copy, ExternalLink, QrCode, Download, AlertCircle } from 'lucide-react';
+import { Loader2, CheckCircle, Smartphone, CreditCard, Banknote, Shield, Lock, Copy, QrCode, Download, AlertCircle } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import api from '../api/axios';
 
@@ -21,6 +21,7 @@ export const PaymentSection: React.FC<PaymentSectionProps> = ({ serviceName, amo
     const [utrNumber, setUtrNumber] = useState('');
     const [copied, setCopied] = useState(false);
     const [downloadingQr, setDownloadingQr] = useState(false);
+    const [qrDownloaded, setQrDownloaded] = useState(false);
     const [validationError, setValidationError] = useState<string | null>(null);
 
     useEffect(() => {
@@ -51,7 +52,10 @@ export const PaymentSection: React.FC<PaymentSectionProps> = ({ serviceName, amo
         setDownloadingQr(true);
         try {
             const svg = document.getElementById('upi-qr-svg');
-            if (!svg) return;
+            if (!svg) {
+                setDownloadingQr(false);
+                return;
+            }
             const svgData = new XMLSerializer().serializeToString(svg);
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
@@ -90,8 +94,15 @@ export const PaymentSection: React.FC<PaymentSectionProps> = ({ serviceName, amo
                     const a = document.createElement('a');
                     a.download = `CyberCafe-QR-Rs${amount}.png`;
                     a.href = canvas.toDataURL('image/png');
+                    document.body.appendChild(a);
                     a.click();
+                    document.body.removeChild(a);
+                    setQrDownloaded(true);
+                    setTimeout(() => setQrDownloaded(false), 5000);
                 }
+                setDownloadingQr(false);
+            };
+            img.onerror = () => {
                 setDownloadingQr(false);
             };
             img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
@@ -232,41 +243,48 @@ export const PaymentSection: React.FC<PaymentSectionProps> = ({ serviceName, amo
                         </div>
                     </div>
 
-                    {/* QR Code Action Buttons (Download QR + Open App) */}
-                    <div className="flex flex-col sm:flex-row items-center justify-center gap-2 max-w-md mx-auto mb-4">
-                        {/* Download QR Button (Gallery Se Pay Karne Ke Liye) */}
+                    {/* Primary Action: Download QR Code for Gallery Scan */}
+                    <div className="max-w-sm mx-auto mb-3">
                         <button
                             type="button"
                             onClick={handleDownloadQr}
                             disabled={downloadingQr}
-                            className="w-full sm:w-auto flex-1 py-2.5 px-4 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-xl text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-xs"
+                            className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer active:scale-[0.98]"
                             title="Download barcode photo to pay from PhonePe/GPay gallery"
                         >
-                            {downloadingQr ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5 text-blue-600" />}
-                            <span>Download Barcode (Pay via Gallery)</span>
+                            {downloadingQr ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : qrDownloaded ? (
+                                <CheckCircle className="w-4 h-4 text-emerald-300" />
+                            ) : (
+                                <Download className="w-4 h-4" />
+                            )}
+                            <span>
+                                {qrDownloaded
+                                    ? 'Barcode Saved! Open UPI App → Scan from Gallery'
+                                    : 'Download Barcode (Pay via Gallery)'}
+                            </span>
                         </button>
-
-                        {/* Open Directly in UPI App (PhonePe, GPay, Paytm) */}
-                        <a
-                            href={upiUri}
-                            className="w-full sm:w-auto flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm"
-                        >
-                            <ExternalLink className="w-3.5 h-3.5" />
-                            <span>Open in UPI App</span>
-                        </a>
                     </div>
 
                     {/* UPI ID display with Copy button */}
-                    <div className="flex items-center justify-center gap-2 max-w-sm mx-auto mb-5 bg-white dark:bg-slate-800 p-2 rounded-xl border border-slate-200 dark:border-slate-700">
+                    <div className="flex items-center justify-center gap-2 max-w-sm mx-auto mb-4 bg-white dark:bg-slate-800 p-2 rounded-xl border border-slate-200 dark:border-slate-700">
                         <span className="text-xs font-mono font-bold text-slate-700 dark:text-slate-200 truncate pl-2">{upiId}</span>
                         <button
                             type="button"
                             onClick={handleCopyUpi}
-                            className="px-3 py-1 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center gap-1.5 transition-colors shrink-0"
+                            className="px-3 py-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer"
                         >
                             <Copy className="w-3.5 h-3.5" />
-                            {copied ? 'Copied!' : 'Copy'}
+                            {copied ? 'Copied!' : 'Copy UPI ID'}
                         </button>
+                    </div>
+
+                    {/* Quick How-To-Pay Steps for Mobile & Desktop */}
+                    <div className="max-w-md mx-auto mb-4 px-3 py-2.5 rounded-xl bg-white/80 dark:bg-slate-800/60 border border-blue-100 dark:border-slate-700 text-[11px] text-slate-600 dark:text-slate-300 text-left space-y-1">
+                        <p className="font-bold text-slate-800 dark:text-white">Payment Kaise Karein?</p>
+                        <p>1. <strong>Same Mobile:</strong> Barcode download karein → PhonePe/GPay kholein → <strong>Scan QR → Gallery</strong> se barcode select karke pay karein.</p>
+                        <p>2. <strong>Ya Copy UPI ID:</strong> Upar se UPI ID copy karke PhonePe/GPay me seedha ₹{amount} transfer karein.</p>
                     </div>
 
                     {/* Enter UTR Number Input - Strictly Mandatory */}
