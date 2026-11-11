@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Search, Loader2, FileText, CheckCircle, Clock, Copy, XCircle, AlertTriangle, RefreshCw, Hash, Download, Image as ImageIcon } from 'lucide-react';
 import api from '../api/axios';
-import { generateReceipt } from '../utils/pdfGenerator';
+import { generateReceiptFromElement } from '../utils/pdfGenerator';
 import { AcknowledgementReceipt } from '../components/AcknowledgementReceipt';
 import { toJpeg } from 'html-to-image';
 
@@ -46,6 +46,7 @@ export const TrackApplication: React.FC = () => {
     const [error, setError] = useState('');
     const [copied, setCopied] = useState(false);
     const [downloadingJpeg, setDownloadingJpeg] = useState(false);
+    const [downloadingPdf, setDownloadingPdf] = useState(false);
     const receiptRef = useRef<HTMLDivElement>(null);
 
     const handleTrack = async (e: React.FormEvent) => {
@@ -69,6 +70,16 @@ export const TrackApplication: React.FC = () => {
         }
     };
 
+    const handleDownloadPdf = async () => {
+        if (!application) return;
+        try {
+            setDownloadingPdf(true);
+            await generateReceiptFromElement(receiptRef.current, application.trackingId, application);
+        } finally {
+            setDownloadingPdf(false);
+        }
+    };
+
     const handleDownloadJpeg = async () => {
         if (!receiptRef.current) return;
         try {
@@ -81,7 +92,9 @@ export const TrackApplication: React.FC = () => {
             const link = document.createElement('a');
             link.download = `Receipt-${application?.trackingId || 'Application'}.jpg`;
             link.href = dataUrl;
+            document.body.appendChild(link);
             link.click();
+            document.body.removeChild(link);
         } catch (err) {
             console.error('Failed to generate receipt image:', err);
             alert('Could not download image. Please use Download PDF instead.');
@@ -316,10 +329,12 @@ export const TrackApplication: React.FC = () => {
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     <button
                                         type="button"
-                                        onClick={() => generateReceipt(application)}
-                                        className="py-3.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer"
+                                        onClick={handleDownloadPdf}
+                                        disabled={downloadingPdf}
+                                        className="py-3.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer disabled:opacity-50"
                                     >
-                                        <Download className="w-4 h-4" /> Download PDF Receipt
+                                        {downloadingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                                        {downloadingPdf ? 'Generating PDF...' : 'Download PDF Receipt'}
                                     </button>
                                     <button
                                         type="button"
@@ -336,8 +351,19 @@ export const TrackApplication: React.FC = () => {
                                     Last Updated: {new Date(application.updatedAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                 </p>
 
-                                {/* Offscreen or Visible Receipt Element for JPEG Generation */}
-                                <div className="mt-4 overflow-x-auto">
+                                {/* Offscreen hidden receipt element captured for both PDF and JPEG downloads */}
+                                <div
+                                    aria-hidden="true"
+                                    style={{
+                                        position: 'fixed',
+                                        left: '-9999px',
+                                        top: 0,
+                                        width: '720px',
+                                        pointerEvents: 'none',
+                                        backgroundColor: '#ffffff',
+                                        zIndex: -1,
+                                    }}
+                                >
                                     <AcknowledgementReceipt ref={receiptRef} application={application} />
                                 </div>
                             </div>

@@ -8,10 +8,16 @@ const createInquiry = async (req, res) => {
     try {
         const { name, mobile, email, message } = req.body;
 
-        if (!name || !mobile) {
+        if (!name || !mobile || !email) {
             return res.status(400).json({
                 success: false,
-                message: 'Name and Mobile Number are required'
+                message: 'Name, Mobile Number, and Email are required'
+            });
+        }
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim())) {
+            return res.status(400).json({
+                success: false,
+                message: 'Please provide a valid email address'
             });
         }
 

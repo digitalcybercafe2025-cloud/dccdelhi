@@ -5,9 +5,10 @@ import { PaymentSection } from '../components/PaymentSection';
 import { AcknowledgementReceipt } from '../components/AcknowledgementReceipt';
 import { SERVICES } from '../../constants';
 import api from '../api/axios';
-import { generateReceipt } from '../utils/pdfGenerator';
+import { generateReceiptFromElement } from '../utils/pdfGenerator';
+import { loadApplicationDraft, saveApplicationDraft, clearApplicationDraft } from '../utils/draftStorage';
 import { toJpeg } from 'html-to-image';
-import { Loader2, ArrowLeft, CheckCircle, Download, Image as ImageIcon, Hash } from 'lucide-react';
+import { Loader2, ArrowLeft, CheckCircle, Download, Image as ImageIcon, Hash, ShieldCheck } from 'lucide-react';
 
 type Step = 'form' | 'payment' | 'success';
 
@@ -28,6 +29,9 @@ export const ApplyService: React.FC = () => {
     const [applicationResult, setApplicationResult] = useState<any>(null);
     const [copied, setCopied] = useState(false);
     const [downloadingJpeg, setDownloadingJpeg] = useState(false);
+    const [downloadingPdf, setDownloadingPdf] = useState(false);
+    const [restoredDraft, setRestoredDraft] = useState<any>(null);
+    const [draftRestoredBanner, setDraftRestoredBanner] = useState(false);
     const receiptRef = useRef<HTMLDivElement>(null);
 
     // Collected from ServiceForm
@@ -66,11 +70,26 @@ export const ApplyService: React.FC = () => {
             }
         };
 
-        fetchServiceData().finally(() => setServiceLoading(false));
+        const restoreDraft = async () => {
+            if (!id) return;
+            const draft = await loadApplicationDraft(id);
+            if (draft) {
+                setRestoredDraft(draft);
+                if (draft.step === 'payment' && draft.userDetails) {
+                    setCollectedUserDetails(draft.userDetails);
+                    setCollectedSpecificFields(draft.specificFields || {});
+                    setCollectedFiles(draft.files || []);
+                    setStep('payment');
+                    setDraftRestoredBanner(true);
+                }
+            }
+        };
+
+        Promise.all([fetchServiceData(), restoreDraft()]).finally(() => setServiceLoading(false));
     }, [id, navigate]);
 
     // Called when ServiceForm completes both user details + document upload
-    const handleFormComplete = (
+    const handleFormComplete = async (
         userDetails: any,
         documents: File[],
         serviceSpecificData: Record<string, string>
@@ -79,6 +98,20 @@ export const ApplyService: React.FC = () => {
         setCollectedFiles(documents);
         setCollectedSpecificFields(serviceSpecificData);
         setStep('payment');
+        setDraftRestoredBanner(false);
+
+        const serviceKey = id || service?.id || '';
+        if (serviceKey) {
+            await saveApplicationDraft({
+                serviceId: serviceKey,
+                step: 'payment',
+                formSubStep: 'documents',
+                userDetails,
+                specificFields: serviceSpecificData,
+                files: documents,
+                updatedAt: Date.now(),
+            });
+        }
     };
 
     const handlePaymentComplete = async (paymentDetails: { transactionId: string; method: string }) => {
@@ -126,6 +159,10 @@ export const ApplyService: React.FC = () => {
             if (response.data.success) {
                 setApplicationResult(response.data.data);
                 setStep('success');
+                setDraftRestoredBanner(false);
+                if (id || service.id) {
+                    await clearApplicationDraft(id || service.id);
+                }
             } else {
                 alert(`Submission failed: ${response.data.message}`);
             }
@@ -139,13 +176,18 @@ export const ApplyService: React.FC = () => {
 
     const handleDownloadReceipt = async () => {
         if (!applicationResult || !service) return;
-        await generateReceipt({
-            ...applicationResult,
-            paymentDetails: {
-                ...applicationResult.paymentDetails,
-                paymentDate: applicationResult.paymentDetails?.paymentDate || new Date()
-            }
-        });
+        try {
+            setDownloadingPdf(true);
+            await generateReceiptFromElement(receiptRef.current, applicationResult.trackingId, {
+                ...applicationResult,
+                paymentDetails: {
+                    ...applicationResult.paymentDetails,
+                    paymentDate: applicationResult.paymentDetails?.paymentDate || new Date()
+                }
+            });
+        } finally {
+            setDownloadingPdf(false);
+        }
     };
 
     const handleDownloadJpeg = async () => {
@@ -252,6 +294,7 @@ export const ApplyService: React.FC = () => {
                         {/* ── FORM STEPS ── */}
                         {step === 'form' && (
                             <ServiceForm
+                                serviceId={id || service.id}
                                 serviceName={service.title}
                                 requiredDocs={service.requiredDocs}
                                 mandatoryDocs={service.mandatoryDocs}
@@ -259,18 +302,46 @@ export const ApplyService: React.FC = () => {
                                 addressProofs={service.addressProofs}
                                 otherDocs={service.otherDocs}
                                 serviceSpecificFields={service.serviceSpecificFields}
+                                initialDraft={restoredDraft}
                                 onComplete={handleFormComplete}
                             />
                         )}
 
                         {/* ── PAYMENT ── */}
                         {step === 'payment' && (
-                            <PaymentSection
-                                serviceName={service.title}
-                                amount={service.fee}
-                                onPaymentComplete={handlePaymentComplete}
-                                isProcessing={isProcessing}
-                            />
+                            <div className="space-y-4">
+                                <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30 text-xs">
+                                    <div className="flex items-center gap-2 font-bold text-emerald-700 dark:text-emerald-300">
+                                        <ShieldCheck className="w-4 h-4 shrink-0 text-emerald-600" />
+                                        <span>
+                                            {draftRestoredBanner
+                                                ? `Welcome back! Your form & ${collectedFiles.length} document(s) are safely restored. Enter UTR below.`
+                                                : `Application & ${collectedFiles.length} document(s) auto-saved safely while you pay.`}
+                                        </span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setRestoredDraft({
+                                                formSubStep: 'documents',
+                                                userDetails: collectedUserDetails,
+                                                specificFields: collectedSpecificFields,
+                                                files: collectedFiles,
+                                            });
+                                            setStep('form');
+                                        }}
+                                        className="text-[11px] font-black text-blue-600 hover:underline uppercase tracking-wider cursor-pointer"
+                                    >
+                                        Edit Details / Docs
+                                    </button>
+                                </div>
+                                <PaymentSection
+                                    serviceName={service.title}
+                                    amount={service.fee}
+                                    onPaymentComplete={handlePaymentComplete}
+                                    isProcessing={isProcessing}
+                                />
+                            </div>
                         )}
 
                         {/* ── SUCCESS ── */}
@@ -316,9 +387,11 @@ export const ApplyService: React.FC = () => {
                                     <button
                                         type="button"
                                         onClick={handleDownloadReceipt}
-                                        className="px-6 py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs uppercase tracking-wider shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 transform active:scale-95 transition-all cursor-pointer"
+                                        disabled={downloadingPdf}
+                                        className="px-6 py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs uppercase tracking-wider shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 transform active:scale-95 transition-all cursor-pointer disabled:opacity-50"
                                     >
-                                        <Download className="w-4 h-4" /> Download PDF Receipt
+                                        {downloadingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                                        {downloadingPdf ? 'Generating PDF...' : 'Download PDF Receipt'}
                                     </button>
                                     <button
                                         type="button"

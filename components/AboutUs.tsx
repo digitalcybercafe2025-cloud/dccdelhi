@@ -67,6 +67,12 @@ export const AboutUs: React.FC<AboutUsProps> = ({ content, onSendEnquiry }) => {
       return;
     }
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email.trim())) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const success = await onSendEnquiry(formData);
@@ -238,8 +244,9 @@ export const AboutUs: React.FC<AboutUsProps> = ({ content, onSendEnquiry }) => {
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-black uppercase text-slate-400">Email (Opt)</label>
+                      <label className="text-[10px] font-black uppercase text-slate-400">Email *</label>
                       <input
+                        required
                         type="email"
                         value={formData.email}
                         onChange={e => setFormData({ ...formData, email: e.target.value })}

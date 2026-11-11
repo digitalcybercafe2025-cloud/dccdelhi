@@ -1,8 +1,10 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useDropzone, FileRejection } from 'react-dropzone';
-import { FileText, CheckCircle, ChevronRight, AlertCircle, X, Upload, Eye, ShieldCheck, MapPin, Files } from 'lucide-react';
+import { FileText, CheckCircle, ChevronRight, AlertCircle, X, Upload, Eye, ShieldCheck, MapPin, Files, Loader2 } from 'lucide-react';
 import type { ServiceSpecificField } from '../../types';
+import { compressDocumentFile } from '../utils/fileCompressor';
+import { saveApplicationDraft } from '../utils/draftStorage';
 
 interface UserDetails {
     fullName: string;
@@ -16,6 +18,7 @@ interface UserDetails {
 }
 
 interface ServiceFormProps {
+    serviceId?: string;
     serviceName: string;
     requiredDocs: string[];
     mandatoryDocs?: string[];
@@ -23,6 +26,12 @@ interface ServiceFormProps {
     addressProofs?: string[];
     otherDocs?: string[];
     serviceSpecificFields?: ServiceSpecificField[];
+    initialDraft?: {
+        formSubStep?: 'details' | 'documents';
+        userDetails?: UserDetails | null;
+        specificFields?: Record<string, string>;
+        files?: File[];
+    } | null;
     onComplete: (
         userDetails: UserDetails,
         documents: File[],
@@ -30,20 +39,36 @@ interface ServiceFormProps {
     ) => void;
 }
 
-// Per-document dropzone
+// Per-document dropzone with smart HD image compression
 const DocDropzone: React.FC<{
     docName: string;
     file: File | undefined;
     onFileAccepted: (file: File) => void;
     onRemove: () => void;
 }> = ({ docName, file, onFileAccepted, onRemove }) => {
-    const onDrop = useCallback((accepted: File[], rejected: FileRejection[]) => {
+    const [compressing, setCompressing] = useState(false);
+
+    const onDrop = useCallback(async (accepted: File[], rejected: FileRejection[]) => {
         if (accepted.length > 0) {
-            onFileAccepted(accepted[0]);
+            const rawFile = accepted[0];
+            if (rawFile.type === 'application/pdf' && rawFile.size > 5 * 1024 * 1024) {
+                alert('PDF file is too large. Max 5MB allowed for PDFs.');
+                return;
+            }
+            setCompressing(true);
+            try {
+                const result = await compressDocumentFile(rawFile);
+                if (result.wasCompressed) {
+                    (result.file as any).originalSize = result.originalSize;
+                }
+                onFileAccepted(result.file);
+            } finally {
+                setCompressing(false);
+            }
         } else if (rejected.length > 0) {
             const reason = rejected[0]?.errors[0]?.code;
-            if (reason === 'file-too-large') alert('File is too large. Max 5MB allowed.');
-            else alert('Invalid file type. Use JPG, PNG, GIF, or PDF.');
+            if (reason === 'file-too-large') alert('File is too large. Max 15MB allowed.');
+            else alert('Invalid file type. Use JPG, PNG, WEBP, GIF, or PDF.');
         }
     }, [onFileAccepted]);
 
@@ -54,10 +79,11 @@ const DocDropzone: React.FC<{
         accept: {
             'image/jpeg': ['.jpg', '.jpeg'],
             'image/png': ['.png'],
+            'image/webp': ['.webp'],
             'image/gif': ['.gif'],
             'application/pdf': ['.pdf'],
         },
-        maxSize: 5 * 1024 * 1024,
+        maxSize: 15 * 1024 * 1024,
         multiple: false,
     });
 
@@ -67,7 +93,17 @@ const DocDropzone: React.FC<{
         return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
     };
 
+    if (compressing) {
+        return (
+            <div className="w-full h-24 rounded-xl border-2 border-dashed border-blue-300 bg-blue-50/50 dark:bg-blue-500/10 flex flex-col items-center justify-center gap-2">
+                <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+                <p className="text-xs font-bold text-blue-700 dark:text-blue-300">Optimizing HD quality & size...</p>
+            </div>
+        );
+    }
+
     if (file) {
+        const origSize = (file as any).originalSize;
         return (
             <div className="w-full rounded-xl border-2 border-emerald-400/50 dark:border-emerald-500/40 bg-emerald-50 dark:bg-emerald-500/10 p-4 flex items-center gap-4 animate-in zoom-in-95 duration-300">
                 <div className="w-10 h-10 rounded-lg bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center shrink-0">
@@ -78,7 +114,12 @@ const DocDropzone: React.FC<{
                 </div>
                 <div className="flex-1 min-w-0">
                     <p className="text-sm font-bold text-emerald-700 dark:text-emerald-300 truncate">{file.name}</p>
-                    <p className="text-[10px] font-bold text-emerald-500/70 uppercase">{formatSize(file.size)} • {file.type.includes('pdf') ? 'PDF' : 'Image'}</p>
+                    <p className="text-[10px] font-bold text-emerald-600/80 dark:text-emerald-400/80 uppercase">
+                        {formatSize(file.size)}
+                        {origSize && origSize > file.size ? ` (compressed from ${formatSize(origSize)})` : ''}
+                        {' • '}
+                        {file.type.includes('pdf') ? 'PDF' : 'HD Compressed Image'}
+                    </p>
                 </div>
                 <div className="flex items-center gap-2">
                     <CheckCircle className="w-5 h-5 text-emerald-500" />
@@ -110,7 +151,7 @@ const DocDropzone: React.FC<{
                 ? <p className="text-xs font-bold text-brand dark:text-emerald-400">Drop here!</p>
                 : <p className="text-xs font-bold text-slate-400 text-center px-4">
                     Drag & drop or <span className="text-brand dark:text-emerald-400">browse</span><br />
-                    <span className="text-[10px] font-semibold text-slate-300 dark:text-slate-600">JPG, PNG, GIF, PDF • Max 5MB</span>
+                    <span className="text-[10px] font-semibold text-slate-400">JPG, PNG, WEBP (Auto-Compressed HD) or PDF • Max 5MB</span>
                 </p>
             }
         </div>
@@ -118,6 +159,7 @@ const DocDropzone: React.FC<{
 };
 
 const ServiceForm: React.FC<ServiceFormProps> = ({
+    serviceId,
     serviceName,
     requiredDocs = [],
     mandatoryDocs = [],
@@ -125,12 +167,21 @@ const ServiceForm: React.FC<ServiceFormProps> = ({
     addressProofs = [],
     otherDocs = [],
     serviceSpecificFields = [],
+    initialDraft = null,
     onComplete,
 }) => {
-    const [step, setStep] = useState<'details' | 'documents'>('details');
-    const [collectedDetails, setCollectedDetails] = useState<UserDetails | null>(null);
-    const [collectedSpecific, setCollectedSpecific] = useState<Record<string, string>>({});
-    const [uploadedFiles, setUploadedFiles] = useState<{ docType: string; file: File }[]>([]);
+    const [step, setStep] = useState<'details' | 'documents'>(
+        initialDraft?.formSubStep === 'documents' && initialDraft?.userDetails ? 'documents' : 'details'
+    );
+    const [collectedDetails, setCollectedDetails] = useState<UserDetails | null>(initialDraft?.userDetails || null);
+    const [collectedSpecific, setCollectedSpecific] = useState<Record<string, string>>(initialDraft?.specificFields || {});
+    const [uploadedFiles, setUploadedFiles] = useState<{ docType: string; file: File }[]>(() => {
+        if (!initialDraft?.files?.length) return [];
+        return initialDraft.files.map(f => ({
+            docType: (f as any).docType || f.name,
+            file: f,
+        }));
+    });
 
     // Category resolution & normalization
     const hasCategorized = (mandatoryDocs && mandatoryDocs.length > 0) ||
@@ -152,15 +203,56 @@ const ServiceForm: React.FC<ServiceFormProps> = ({
     const initialSlot = activeMandatory[0] || selectedIdProof || selectedAddressProof || selectedOtherDoc || 'Document';
     const [activeDocSlot, setActiveDocSlot] = useState<string>(initialSlot);
 
-    const { register, handleSubmit, formState: { errors } } = useForm<UserDetails & Record<string, string>>();
+    const { register, handleSubmit, reset, formState: { errors } } = useForm<UserDetails & Record<string, string>>({
+        defaultValues: {
+            ...(initialDraft?.userDetails || {}),
+            ...(initialDraft?.specificFields || {}),
+        }
+    });
+
+    useEffect(() => {
+        if (initialDraft?.userDetails) {
+            reset({
+                ...initialDraft.userDetails,
+                ...(initialDraft.specificFields || {}),
+            });
+            setCollectedDetails(initialDraft.userDetails);
+            setCollectedSpecific(initialDraft.specificFields || {});
+            if (initialDraft.files?.length) {
+                setUploadedFiles(initialDraft.files.map(f => ({
+                    docType: (f as any).docType || f.name,
+                    file: f,
+                })));
+            }
+            if (initialDraft.formSubStep === 'documents') {
+                setStep('documents');
+            }
+        }
+    }, [initialDraft, reset]);
+
+    // Auto-save form draft (details + compressed files) to IndexedDB whenever files/step change
+    useEffect(() => {
+        if (!serviceId || !collectedDetails) return;
+        saveApplicationDraft({
+            serviceId,
+            step: 'form',
+            formSubStep: step,
+            userDetails: collectedDetails,
+            specificFields: collectedSpecific,
+            files: uploadedFiles.map(u => {
+                (u.file as any).docType = u.docType;
+                return u.file;
+            }),
+            updatedAt: Date.now(),
+        });
+    }, [serviceId, step, collectedDetails, collectedSpecific, uploadedFiles]);
 
     const onDetailsSubmit = (data: UserDetails & Record<string, string>) => {
-        const standardKeys = ['fullName', 'mobile', 'email', 'address', 'city', 'state', 'pincode'];
         const specificData: Record<string, string> = {};
         serviceSpecificFields.forEach(f => {
             if (data[f.name] !== undefined) specificData[f.name] = data[f.name];
         });
-        setCollectedDetails({
+        const nextDetails: UserDetails = {
             fullName: data.fullName,
             mobile: data.mobile,
             email: data.email || '',
@@ -168,7 +260,8 @@ const ServiceForm: React.FC<ServiceFormProps> = ({
             city: data.city,
             state: data.state,
             pincode: data.pincode,
-        });
+        };
+        setCollectedDetails(nextDetails);
         setCollectedSpecific(specificData);
         setStep('documents');
     };

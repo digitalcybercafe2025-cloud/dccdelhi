@@ -47,6 +47,7 @@ const ApplicationsManager: React.FC = () => {
     const [downloadingDoc, setDownloadingDoc] = useState<number | null>(null);
     const [previewDocIndex, setPreviewDocIndex] = useState<number | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+    const [previewMimeType, setPreviewMimeType] = useState<string>('');
     const [previewLoading, setPreviewLoading] = useState(false);
 
     // Delete Modal State
@@ -113,13 +114,29 @@ const ApplicationsManager: React.FC = () => {
         finally { setUpdating(false); }
     };
 
+    const inferMimeType = (doc: any, headerContentType?: string) => {
+        if (headerContentType && headerContentType !== 'application/octet-stream') {
+            return headerContentType.split(';')[0].trim().toLowerCase();
+        }
+        if (doc?.mimeType) return String(doc.mimeType).toLowerCase();
+        const name = String(doc?.originalName || doc?.path || '').toLowerCase();
+        if (name.endsWith('.pdf')) return 'application/pdf';
+        if (name.endsWith('.png')) return 'image/png';
+        if (name.endsWith('.webp')) return 'image/webp';
+        if (name.endsWith('.gif')) return 'image/gif';
+        if (name.endsWith('.jpg') || name.endsWith('.jpeg')) return 'image/jpeg';
+        return 'application/octet-stream';
+    };
+
     const downloadDocument = async (appId: string, docIndex: number, docName: string) => {
         setDownloadingDoc(docIndex);
         try {
+            const doc = selected?.documents?.[docIndex];
             const response = await api.get(`/applications/${appId}/documents/${docIndex}/download`, {
                 responseType: 'blob'
             });
-            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const mimeType = inferMimeType(doc, response.headers?.['content-type']);
+            const url = window.URL.createObjectURL(new Blob([response.data], { type: mimeType }));
             const link = document.createElement('a');
             link.href = url;
             link.setAttribute('download', docName);
@@ -138,12 +155,16 @@ const ApplicationsManager: React.FC = () => {
         setPreviewDocIndex(docIndex);
         setPreviewLoading(true);
         setPreviewUrl(null);
+        setPreviewMimeType('');
         try {
+            const doc = selected?.documents?.[docIndex];
             const response = await api.get(`/applications/${appId}/documents/${docIndex}/download`, {
                 responseType: 'blob'
             });
-            const blob = new Blob([response.data]);
+            const mimeType = inferMimeType(doc, response.headers?.['content-type']);
+            const blob = new Blob([response.data], { type: mimeType });
             const url = window.URL.createObjectURL(blob);
+            setPreviewMimeType(mimeType);
             setPreviewUrl(url);
         } catch {
             alert('Document preview failed. File may not exist on server.');
@@ -156,6 +177,7 @@ const ApplicationsManager: React.FC = () => {
     const closePreview = () => {
         if (previewUrl) window.URL.revokeObjectURL(previewUrl);
         setPreviewUrl(null);
+        setPreviewMimeType('');
         setPreviewDocIndex(null);
     };
 
@@ -593,7 +615,7 @@ const ApplicationsManager: React.FC = () => {
             )}
 
             {/* ── Document Preview Modal ── */}
-            {previewUrl && (
+            {(previewUrl || previewLoading) && (
                 <div
                     className="fixed inset-0 z-[300] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
                     onClick={closePreview}
@@ -625,9 +647,15 @@ const ApplicationsManager: React.FC = () => {
                         <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-slate-900/5">
                             {previewLoading ? (
                                 <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
-                            ) : (
-                                <iframe src={previewUrl} className="w-full h-[65vh] rounded-xl border border-slate-200" title="Preview" />
-                            )}
+                            ) : previewMimeType.startsWith('image/') && previewUrl ? (
+                                <img
+                                    src={previewUrl}
+                                    alt="Document Preview"
+                                    className="max-w-full max-h-[68vh] mx-auto rounded-xl object-contain shadow-sm bg-white"
+                                />
+                            ) : previewUrl ? (
+                                <iframe src={previewUrl} className="w-full h-[68vh] rounded-xl border border-slate-200 bg-white" title="Preview" />
+                            ) : null}
                         </div>
                     </div>
                 </div>
