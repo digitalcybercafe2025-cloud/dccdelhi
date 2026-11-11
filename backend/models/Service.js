@@ -33,6 +33,14 @@ const serviceSchema = new mongoose.Schema({
     otherDocs: [{
         type: String
     }],
+    documentConfigs: [{
+        subTypeKey: { type: String, required: true, trim: true },
+        subTypeLabel: { type: String, required: true, trim: true },
+        documents: [{
+            name: { type: String, required: true, trim: true },
+            required: { type: Boolean, default: true }
+        }]
+    }],
     category: {
         type: String,
         required: true,

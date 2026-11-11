@@ -262,6 +262,15 @@ export const ApplyService: React.FC = () => {
                         </div>
                     </div>
 
+                    {/* ── Security & Privacy Disclaimer Banner ── */}
+                    {step !== 'success' && (
+                        <div className="bg-amber-50/90 dark:bg-amber-500/10 border-b border-amber-200/80 dark:border-amber-500/20 px-6 py-3">
+                            <p className="text-[11px] sm:text-xs font-bold text-amber-900 dark:text-amber-300 leading-relaxed text-center sm:text-left">
+                                🔒 गोपनीयता एवं सुरक्षा सूचना: आपके द्वारा साझा की गई सभी जानकारियाँ एवं दस्तावेज़ केवल आपके आवेदन को प्रोसेस करने हेतु उपयोग किए जाएंगे। काम पूरा होने के उपरांत 24 घंटे के भीतर आपका समस्त डेटा स्वतः ही डिलीट कर दिया जाएगा।
+                            </p>
+                        </div>
+                    )}
+
                     {/* ── 4-Step Global Progress Bar ── */}
                     {step !== 'success' && (
                         <div className="px-8 pt-7 pb-1">
@@ -301,6 +310,7 @@ export const ApplyService: React.FC = () => {
                                 idProofs={service.idProofs}
                                 addressProofs={service.addressProofs}
                                 otherDocs={service.otherDocs}
+                                documentConfigs={service.documentConfigs}
                                 serviceSpecificFields={service.serviceSpecificFields}
                                 initialDraft={restoredDraft}
                                 onComplete={handleFormComplete}

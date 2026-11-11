@@ -1,5 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Trash2, Plus } from 'lucide-react';
 import api, { getMediaUrl } from '../../api/axios';
+import {
+    MASTER_DOCUMENT_LIST,
+    SUBTYPE_PRESETS,
+    ServiceDocumentConfig,
+} from '../../constants/documentCatalog';
 
 // ── Design tokens matching Dashboard ─────────────────────────────────────────
 const inputCls = 'px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 placeholder:text-slate-400 text-sm font-bold outline-none focus:border-blue-400 transition-colors';
@@ -37,6 +43,16 @@ const ServicesManager: React.FC = () => {
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
+
+    // Dynamic Document Builder State
+    const [documentConfigs, setDocumentConfigs] = useState<ServiceDocumentConfig[]>([
+        { subTypeKey: 'default', subTypeLabel: 'Default / All Applications', documents: [] }
+    ]);
+    const [activeSubTypeKey, setActiveSubTypeKey] = useState<string>('default');
+    const [customSubTypeLabel, setCustomSubTypeLabel] = useState<string>('');
+    const [customDocName, setCustomDocName] = useState<string>('');
+    const [showLegacyCategories, setShowLegacyCategories] = useState<boolean>(false);
+
     const API_BASE = 'http://localhost:5000';
 
     const fetchServices = useCallback(async () => {
@@ -69,10 +85,37 @@ const ServicesManager: React.FC = () => {
         }
     };
 
+    const seedLegacyConfigs = (svc: any): ServiceDocumentConfig[] => {
+        const docsMap = new Map<string, boolean>();
+        const addDocs = (arr: string[] | undefined, req: boolean) => {
+            if (!Array.isArray(arr)) return;
+            arr.forEach(item => {
+                const name = String(item || '').trim();
+                if (name && !docsMap.has(name)) docsMap.set(name, req);
+            });
+        };
+        addDocs(svc.mandatoryDocs, true);
+        addDocs(svc.idProofs, true);
+        addDocs(svc.addressProofs, true);
+        addDocs(svc.otherDocs, false);
+        if (docsMap.size === 0) addDocs(svc.requiredDocs, true);
+        return [{
+            subTypeKey: 'default',
+            subTypeLabel: 'Default / All Applications',
+            documents: Array.from(docsMap.entries()).map(([name, required]) => ({ name, required }))
+        }];
+    };
+
     const openAdd = () => {
         setEditing(null); setForm(EMPTY); setImagePreview(null); setSelectedFile(null); setShowModal(true);
+        setDocumentConfigs([{ subTypeKey: 'default', subTypeLabel: 'Default / All Applications', documents: [] }]);
+        setActiveSubTypeKey('default');
+        setCustomSubTypeLabel('');
+        setCustomDocName('');
+        setShowLegacyCategories(false);
         setError(null); setSuccess(null);
     };
+
     const openEdit = (svc: any) => {
         setEditing(svc);
         const hasCategories = (svc.mandatoryDocs && svc.mandatoryDocs.length > 0) ||
@@ -98,11 +141,86 @@ const ServicesManager: React.FC = () => {
             otherDocs: Array.isArray(svc.otherDocs) ? svc.otherDocs.join(', ') : (svc.otherDocs || ''),
             externalLink: svc.externalLink || ''
         });
+
+        const initialConfigs = Array.isArray(svc.documentConfigs) && svc.documentConfigs.length > 0
+            ? svc.documentConfigs.map((c: any) => ({
+                subTypeKey: c.subTypeKey,
+                subTypeLabel: c.subTypeLabel,
+                documents: Array.isArray(c.documents) ? c.documents.map((d: any) => ({ name: d.name, required: d.required !== false })) : []
+            }))
+            : seedLegacyConfigs(svc);
+
+        setDocumentConfigs(initialConfigs);
+        setActiveSubTypeKey(initialConfigs[0]?.subTypeKey || 'default');
+        setCustomSubTypeLabel('');
+        setCustomDocName('');
+        setShowLegacyCategories(false);
+
         const imgUrl = getMediaUrl(svc.image);
         setImagePreview(imgUrl);
         setSelectedFile(null);
         setShowModal(true);
         setError(null); setSuccess(null);
+    };
+
+    // Dynamic Builder Helpers
+    const activeConfig = documentConfigs.find(c => c.subTypeKey === activeSubTypeKey) || documentConfigs[0];
+
+    const addSubTypeConfig = (key: string, label: string) => {
+        const cleanKey = key.trim();
+        const cleanLabel = label.trim();
+        if (!cleanKey || !cleanLabel) return;
+        const exists = documentConfigs.find(c => c.subTypeKey === cleanKey);
+        if (exists) {
+            setActiveSubTypeKey(cleanKey);
+            return;
+        }
+        setDocumentConfigs(prev => [...prev, { subTypeKey: cleanKey, subTypeLabel: cleanLabel, documents: [] }]);
+        setActiveSubTypeKey(cleanKey);
+    };
+
+    const removeSubTypeConfig = (keyToRemove: string) => {
+        if (documentConfigs.length <= 1) return;
+        const remaining = documentConfigs.filter(c => c.subTypeKey !== keyToRemove);
+        setDocumentConfigs(remaining);
+        if (activeSubTypeKey === keyToRemove) {
+            setActiveSubTypeKey(remaining[0]?.subTypeKey || 'default');
+        }
+    };
+
+    const handleAutoAddDocument = (docName: string) => {
+        const cleanName = docName.trim();
+        if (!cleanName || !activeConfig) return;
+        setDocumentConfigs(prev => prev.map(cfg => {
+            if (cfg.subTypeKey !== activeConfig.subTypeKey) return cfg;
+            if (cfg.documents.some(d => d.name.toLowerCase() === cleanName.toLowerCase())) return cfg;
+            return {
+                ...cfg,
+                documents: [...cfg.documents, { name: cleanName, required: true }]
+            };
+        }));
+    };
+
+    const handleToggleDocRequirement = (docName: string, required: boolean) => {
+        if (!activeConfig) return;
+        setDocumentConfigs(prev => prev.map(cfg => {
+            if (cfg.subTypeKey !== activeConfig.subTypeKey) return cfg;
+            return {
+                ...cfg,
+                documents: cfg.documents.map(d => d.name === docName ? { ...d, required } : d)
+            };
+        }));
+    };
+
+    const handleRemoveDocFromConfig = (docName: string) => {
+        if (!activeConfig) return;
+        setDocumentConfigs(prev => prev.map(cfg => {
+            if (cfg.subTypeKey !== activeConfig.subTypeKey) return cfg;
+            return {
+                ...cfg,
+                documents: cfg.documents.filter(d => d.name !== docName)
+            };
+        }));
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -119,13 +237,20 @@ const ServicesManager: React.FC = () => {
                 }
             });
 
-            // Combine categories into requiredDocs for 100% backward compatibility
-            const combinedList = [
+            // Save flexible JSON documentConfigs tied to Service & Sub-Types
+            formData.append('documentConfigs', JSON.stringify(documentConfigs));
+
+            // Combine categories + configured docs into requiredDocs for 100% backward compatibility
+            const configDocsFlat = Array.from(
+                new Set(documentConfigs.flatMap(c => c.documents.map(d => d.name)))
+            );
+            const combinedList = Array.from(new Set([
                 ...form.mandatoryDocs.split(',').map(s => s.trim()).filter(Boolean),
                 ...form.idProofs.split(',').map(s => s.trim()).filter(Boolean),
                 ...form.addressProofs.split(',').map(s => s.trim()).filter(Boolean),
-                ...form.otherDocs.split(',').map(s => s.trim()).filter(Boolean)
-            ];
+                ...form.otherDocs.split(',').map(s => s.trim()).filter(Boolean),
+                ...configDocsFlat
+            ]));
             if (combinedList.length > 0) {
                 formData.set('requiredDocs', combinedList.join(', '));
             }
@@ -397,65 +522,219 @@ const ServicesManager: React.FC = () => {
                                 <input value={form.externalLink} onChange={e => setForm(f => ({ ...f, externalLink: e.target.value }))}
                                     placeholder="https://..." className={modalInputCls} />
                             </div>
-                            {/* ── Categorized Document Requirements ── */}
-                            <div className="col-span-2 bg-slate-100/70 p-3.5 rounded-2xl border border-slate-200/80 space-y-3">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                                        📁 Document Requirements by Category
-                                    </span>
-                                    <span className="text-[10px] font-bold text-slate-400">Comma-separated lists</span>
+                            {/* ── Dynamic Sub-Service Document Builder ── */}
+                            <div className="col-span-2 bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-4">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div>
+                                        <span className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                                            📂 Dynamic Document Builder
+                                        </span>
+                                        <p className="text-[10px] font-medium text-slate-500 mt-0.5">
+                                            Configure documents per service type / correction option (auto-rendered on Step 2).
+                                        </p>
+                                    </div>
+                                    <select
+                                        value=""
+                                        onChange={e => {
+                                            const val = e.target.value;
+                                            if (!val) return;
+                                            const preset = SUBTYPE_PRESETS.find(p => p.key === val);
+                                            if (preset) addSubTypeConfig(preset.key, preset.label);
+                                            e.target.value = '';
+                                        }}
+                                        className="px-3 py-1.5 rounded-xl bg-white border border-blue-200 text-blue-700 text-xs font-bold outline-none cursor-pointer"
+                                    >
+                                        <option value="">+ Add Service / Sub-Type Preset...</option>
+                                        {SUBTYPE_PRESETS.map(p => (
+                                            <option key={p.key} value={p.key}>{p.label}</option>
+                                        ))}
+                                    </select>
                                 </div>
 
-                                <div>
-                                    <label className="text-[10px] font-black text-red-600 uppercase tracking-widest block mb-1">
-                                        1. Mandatory Documents (अनिवार्य दस्तावेज़ *)
-                                    </label>
+                                {/* Custom Sub-Type Adder */}
+                                <div className="flex gap-2">
                                     <input
-                                        value={form.mandatoryDocs}
-                                        onChange={e => setForm(f => ({ ...f, mandatoryDocs: e.target.value }))}
-                                        placeholder="Passport Photo, Signature, Application Form..."
-                                        className={modalInputCls}
+                                        type="text"
+                                        value={customSubTypeLabel}
+                                        onChange={e => setCustomSubTypeLabel(e.target.value)}
+                                        placeholder="Or type custom sub-type (e.g. Reprint / Renewal)..."
+                                        className="flex-1 px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 outline-none focus:border-blue-400"
                                     />
-                                    <p className="text-[10px] text-slate-400 font-medium mt-0.5">Customer must upload every item listed here.</p>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (!customSubTypeLabel.trim()) return;
+                                            const slug = customSubTypeLabel.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_');
+                                            addSubTypeConfig(slug, customSubTypeLabel.trim());
+                                            setCustomSubTypeLabel('');
+                                        }}
+                                        className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-black text-white text-xs font-bold flex items-center gap-1 transition-colors"
+                                    >
+                                        <Plus className="w-3.5 h-3.5" /> Add Type
+                                    </button>
                                 </div>
 
-                                <div>
-                                    <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest block mb-1">
-                                        2. Identity Proofs (पहचान पत्र - Any One)
-                                    </label>
-                                    <input
-                                        value={form.idProofs}
-                                        onChange={e => setForm(f => ({ ...f, idProofs: e.target.value }))}
-                                        placeholder="Aadhaar Card, PAN Card, Voter ID, Passport, Driving License..."
-                                        className={modalInputCls}
-                                    />
-                                    <p className="text-[10px] text-slate-400 font-medium mt-0.5">Customer selects and uploads their available ID proof.</p>
+                                {/* Sub-Type Tabs */}
+                                <div className="flex flex-wrap gap-1.5 pb-2 border-b border-slate-200">
+                                    {documentConfigs.map(cfg => {
+                                        const isActive = cfg.subTypeKey === activeConfig?.subTypeKey;
+                                        return (
+                                            <div
+                                                key={cfg.subTypeKey}
+                                                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                                                    isActive
+                                                        ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                                                        : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300'
+                                                }`}
+                                                onClick={() => setActiveSubTypeKey(cfg.subTypeKey)}
+                                            >
+                                                <span>{cfg.subTypeLabel}</span>
+                                                <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                                                    {cfg.documents.length}
+                                                </span>
+                                                {documentConfigs.length > 1 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => { e.stopPropagation(); removeSubTypeConfig(cfg.subTypeKey); }}
+                                                        className={`ml-0.5 hover:text-red-400 ${isActive ? 'text-white/80' : 'text-slate-400'}`}
+                                                        title="Remove this sub-type"
+                                                    >
+                                                        ✕
+                                                    </button>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
                                 </div>
 
-                                <div>
-                                    <label className="text-[10px] font-black text-emerald-600 uppercase tracking-widest block mb-1">
-                                        3. Address Proofs (पते का प्रमाण - Any One)
-                                    </label>
-                                    <input
-                                        value={form.addressProofs}
-                                        onChange={e => setForm(f => ({ ...f, addressProofs: e.target.value }))}
-                                        placeholder="Electricity Bill, Ration Card, Domicile Certificate, Water Bill..."
-                                        className={modalInputCls}
-                                    />
-                                    <p className="text-[10px] text-slate-400 font-medium mt-0.5">Customer selects and uploads their address proof.</p>
-                                </div>
+                                {/* Master Document Auto-Add Dropdown + Custom Document */}
+                                {activeConfig && (
+                                    <div className="space-y-3">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                            <div>
+                                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block mb-1">
+                                                    Select Master Document (Auto-Adds)
+                                                </label>
+                                                <select
+                                                    value=""
+                                                    onChange={e => {
+                                                        if (e.target.value) {
+                                                            handleAutoAddDocument(e.target.value);
+                                                            e.target.value = '';
+                                                        }
+                                                    }}
+                                                    className="w-full px-3 py-2.5 rounded-xl bg-white border border-blue-200 text-slate-800 text-xs font-bold outline-none focus:border-blue-500 cursor-pointer"
+                                                >
+                                                    <option value="">-- Pick Document to Add Instantly --</option>
+                                                    {MASTER_DOCUMENT_LIST.map(doc => (
+                                                        <option key={doc} value={doc}>{doc}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block mb-1">
+                                                    Or Add Custom Document
+                                                </label>
+                                                <div className="flex gap-1.5">
+                                                    <input
+                                                        type="text"
+                                                        value={customDocName}
+                                                        onChange={e => setCustomDocName(e.target.value)}
+                                                        placeholder="e.g. Affidavit"
+                                                        className="flex-1 px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-800 outline-none focus:border-blue-400"
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            if (customDocName.trim()) {
+                                                                handleAutoAddDocument(customDocName);
+                                                                setCustomDocName('');
+                                                            }
+                                                        }}
+                                                        className="px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold"
+                                                    >
+                                                        Add
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
 
-                                <div>
-                                    <label className="text-[10px] font-black text-amber-600 uppercase tracking-widest block mb-1">
-                                        4. Other Supporting Proofs (अन्य सहायक दस्तावेज़ - Optional)
-                                    </label>
-                                    <input
-                                        value={form.otherDocs}
-                                        onChange={e => setForm(f => ({ ...f, otherDocs: e.target.value }))}
-                                        placeholder="Income Certificate, 10th Marksheet, Caste Certificate..."
-                                        className={modalInputCls}
-                                    />
-                                    <p className="text-[10px] text-slate-400 font-medium mt-0.5">Optional supporting proofs uploaded if applicable.</p>
+                                        {/* Active Sub-Type Document List */}
+                                        {activeConfig.documents.length === 0 ? (
+                                            <div className="p-4 text-center rounded-xl border border-dashed border-slate-300 bg-white text-xs font-semibold text-slate-400">
+                                                No documents configured for <strong>{activeConfig.subTypeLabel}</strong> yet. Select from Master Dropdown above to auto-add.
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
+                                                {activeConfig.documents.map((doc) => (
+                                                    <div
+                                                        key={doc.name}
+                                                        className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-white border border-slate-200 shadow-2xs"
+                                                    >
+                                                        <div className="flex items-center gap-2 min-w-0">
+                                                            <span className={`w-2 h-2 rounded-full shrink-0 ${doc.required ? 'bg-red-500' : 'bg-amber-400'}`} />
+                                                            <span className="text-xs font-bold text-slate-800 truncate">
+                                                                {doc.name} {doc.required && <span className="text-red-500">*</span>}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2 shrink-0">
+                                                            <select
+                                                                value={doc.required ? 'mandatory' : 'optional'}
+                                                                onChange={e => handleToggleDocRequirement(doc.name, e.target.value === 'mandatory')}
+                                                                className={`px-2.5 py-1 rounded-lg text-[11px] font-black border outline-none cursor-pointer ${
+                                                                    doc.required
+                                                                        ? 'bg-red-50 text-red-700 border-red-200'
+                                                                        : 'bg-amber-50 text-amber-700 border-amber-200'
+                                                                }`}
+                                                            >
+                                                                <option value="mandatory">Mandatory (*)</option>
+                                                                <option value="optional">Optional</option>
+                                                            </select>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleRemoveDocFromConfig(doc.name)}
+                                                                className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                                                                title="Detach document"
+                                                            >
+                                                                <Trash2 className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Collapsible Legacy Comma Lists (for backward compatibility) */}
+                                <div className="pt-2 border-t border-slate-200">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowLegacyCategories(prev => !prev)}
+                                        className="text-[10px] font-black text-slate-400 hover:text-slate-600 uppercase tracking-wider"
+                                    >
+                                        {showLegacyCategories ? '▾ Hide Legacy Category Text Lists' : '▸ Show Legacy Category Text Lists (Optional Fallback)'}
+                                    </button>
+                                    {showLegacyCategories && (
+                                        <div className="mt-3 space-y-2">
+                                            <div>
+                                                <label className="text-[10px] font-black text-red-600 uppercase tracking-widest block mb-1">Mandatory (Comma-separated)</label>
+                                                <input value={form.mandatoryDocs} onChange={e => setForm(f => ({ ...f, mandatoryDocs: e.target.value }))} className={modalInputCls} />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest block mb-1">Identity Proofs (Any 1)</label>
+                                                <input value={form.idProofs} onChange={e => setForm(f => ({ ...f, idProofs: e.target.value }))} className={modalInputCls} />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] font-black text-emerald-600 uppercase tracking-widest block mb-1">Address Proofs (Any 1)</label>
+                                                <input value={form.addressProofs} onChange={e => setForm(f => ({ ...f, addressProofs: e.target.value }))} className={modalInputCls} />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] font-black text-amber-600 uppercase tracking-widest block mb-1">Other Supporting (Optional)</label>
+                                                <input value={form.otherDocs} onChange={e => setForm(f => ({ ...f, otherDocs: e.target.value }))} className={modalInputCls} />
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                             <div className="col-span-2">

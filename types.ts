@@ -1,4 +1,6 @@
 
+import type { ServiceDocumentConfig } from './src/constants/documentCatalog';
+
 export enum ApplicationStatus {
   PENDING = 'PENDING',
   REVIEWING = 'REVIEWING',
@@ -40,6 +42,7 @@ export interface Service {
   idProofs?: string[];
   addressProofs?: string[];
   otherDocs?: string[];
+  documentConfigs?: ServiceDocumentConfig[];
   serviceSpecificFields?: ServiceSpecificField[]; // Dynamic per-service fields
   category: string;
   externalLink?: string;

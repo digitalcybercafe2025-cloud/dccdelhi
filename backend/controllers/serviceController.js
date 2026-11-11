@@ -78,36 +78,83 @@ const getServiceById = async (req, res) => {
     }
 };
 
+const normalizeServicePayload = (rawBody, file) => {
+    const data = { ...rawBody };
+    if (file) {
+        data.image = `/uploads/services/${file.filename}`;
+    }
+
+    // Parse legacy categorized string arrays
+    ['mandatoryDocs', 'idProofs', 'addressProofs', 'otherDocs', 'requiredDocs'].forEach(field => {
+        if (data[field] !== undefined && typeof data[field] === 'string') {
+            const trimmed = data[field].trim();
+            if (!trimmed) {
+                data[field] = [];
+            } else {
+                try {
+                    const parsed = JSON.parse(trimmed);
+                    data[field] = Array.isArray(parsed) ? parsed : [String(parsed)];
+                } catch {
+                    data[field] = trimmed.split(',').map(d => d.trim()).filter(Boolean);
+                }
+            }
+        }
+    });
+
+    // Parse flexible dynamic documentConfigs (Service & Sub-Type configs)
+    if (data.documentConfigs !== undefined) {
+        let parsedConfigs = data.documentConfigs;
+        if (typeof parsedConfigs === 'string') {
+            try {
+                parsedConfigs = JSON.parse(parsedConfigs);
+            } catch {
+                parsedConfigs = [];
+            }
+        }
+        if (Array.isArray(parsedConfigs)) {
+            data.documentConfigs = parsedConfigs
+                .filter(cfg => cfg && cfg.subTypeKey && cfg.subTypeLabel)
+                .map(cfg => ({
+                    subTypeKey: String(cfg.subTypeKey).trim(),
+                    subTypeLabel: String(cfg.subTypeLabel).trim(),
+                    documents: Array.isArray(cfg.documents)
+                        ? cfg.documents
+                            .filter(d => d && String(d.name || '').trim())
+                            .map(d => ({
+                                name: String(d.name).trim(),
+                                required: d.required !== false,
+                            }))
+                        : [],
+                }));
+        } else {
+            delete data.documentConfigs;
+        }
+    }
+
+    // Sync requiredDocs cleanly if omitted
+    if (!data.requiredDocs || data.requiredDocs.length === 0) {
+        const configDocNames = Array.isArray(data.documentConfigs)
+            ? Array.from(new Set(data.documentConfigs.flatMap(c => (c.documents || []).map(d => d.name))))
+            : [];
+        const combined = [
+            ...(data.mandatoryDocs || []),
+            ...(data.idProofs || []),
+            ...(data.addressProofs || []),
+            ...(data.otherDocs || []),
+            ...configDocNames,
+        ];
+        if (combined.length > 0) data.requiredDocs = Array.from(new Set(combined));
+    }
+
+    return data;
+};
+
 // @desc    Create new service
 // @route   POST /api/services
 // @access  Private (Admin)
 const createService = async (req, res) => {
     try {
-        const serviceData = { ...req.body };
-        if (req.file) {
-            serviceData.image = `/uploads/services/${req.file.filename}`;
-        }
-
-        // Handle categorized document fields
-        ['mandatoryDocs', 'idProofs', 'addressProofs', 'otherDocs', 'requiredDocs'].forEach(field => {
-            if (serviceData[field] && typeof serviceData[field] === 'string') {
-                try {
-                    serviceData[field] = JSON.parse(serviceData[field]);
-                } catch (e) {
-                    serviceData[field] = serviceData[field].split(',').map(d => d.trim()).filter(Boolean);
-                }
-            }
-        });
-        if (!serviceData.requiredDocs || serviceData.requiredDocs.length === 0) {
-            const combined = [
-                ...(serviceData.mandatoryDocs || []),
-                ...(serviceData.idProofs || []),
-                ...(serviceData.addressProofs || []),
-                ...(serviceData.otherDocs || [])
-            ];
-            if (combined.length > 0) serviceData.requiredDocs = combined;
-        }
-
+        const serviceData = normalizeServicePayload(req.body, req.file);
         const service = await Service.create(serviceData);
         res.status(201).json({ success: true, data: service });
     } catch (error) {
@@ -120,31 +167,7 @@ const createService = async (req, res) => {
 // @access  Private (Admin)
 const updateService = async (req, res) => {
     try {
-        const updateData = { ...req.body };
-        if (req.file) {
-            updateData.image = `/uploads/services/${req.file.filename}`;
-        }
-
-        // Handle categorized document fields
-        ['mandatoryDocs', 'idProofs', 'addressProofs', 'otherDocs', 'requiredDocs'].forEach(field => {
-            if (updateData[field] && typeof updateData[field] === 'string') {
-                try {
-                    updateData[field] = JSON.parse(updateData[field]);
-                } catch (e) {
-                    updateData[field] = updateData[field].split(',').map(d => d.trim()).filter(Boolean);
-                }
-            }
-        });
-        if (!updateData.requiredDocs || updateData.requiredDocs.length === 0) {
-            const combined = [
-                ...(updateData.mandatoryDocs || []),
-                ...(updateData.idProofs || []),
-                ...(updateData.addressProofs || []),
-                ...(updateData.otherDocs || [])
-            ];
-            if (combined.length > 0) updateData.requiredDocs = combined;
-        }
-
+        const updateData = normalizeServicePayload(req.body, req.file);
         const service = await Service.findByIdAndUpdate(req.params.id, updateData, {
             new: true,
             runValidators: true
