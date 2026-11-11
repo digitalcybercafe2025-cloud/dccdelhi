@@ -188,9 +188,9 @@ const ServiceForm: React.FC<ServiceFormProps> = ({
     });
     const [skippedOptionalDocs, setSkippedOptionalDocs] = useState<string[]>([]);
 
-    // Sub-service / Voter Form 6 vs Form 8 detection
+    // Sub-service / Voter Form 6 vs Form 8 detection (Voter-specific multi-form vs general New/Correction)
     const isVoterStyle = /voter/i.test(serviceName) ||
-        documentConfigs.some(c => c.subTypeKey === 'new' || c.subTypeKey.startsWith('correction'));
+        documentConfigs.some(c => c.subTypeKey.startsWith('correction_'));
 
     const nonDefaultConfigs = useMemo(
         () => documentConfigs.filter(c => c.subTypeKey !== 'default' && c.documents && c.documents.length > 0),

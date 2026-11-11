@@ -36,16 +36,24 @@ export const MASTER_DOCUMENT_LIST: string[] = [
     'Property Tax Receipt',
 ];
 
-export const SUBTYPE_PRESETS: { key: string; label: string }[] = [
+export const GENERAL_SUBTYPE_PRESETS: { key: string; label: string }[] = [
+    { key: 'new', label: 'New' },
+    { key: 'correction', label: 'Correction' },
     { key: 'default', label: 'Default / All Applications' },
-    { key: 'new', label: 'New (Form 6 / Fresh)' },
+];
+
+export const VOTER_SUBTYPE_PRESETS: { key: string; label: string }[] = [
+    { key: 'new', label: 'New (Form 6)' },
     { key: 'correction', label: 'Correction (Form 8 - General)' },
     { key: 'correction_name', label: 'Correction (Form 8 - Name)' },
     { key: 'correction_dob', label: 'Correction (Form 8 - DOB)' },
     { key: 'correction_address', label: 'Correction (Form 8 - Address)' },
     { key: 'correction_photo', label: 'Correction (Form 8 - Photo/Mobile)' },
     { key: 'correction_relation', label: 'Correction (Form 8 - Relation)' },
+    { key: 'default', label: 'Default / All Applications' },
 ];
+
+export const SUBTYPE_PRESETS = VOTER_SUBTYPE_PRESETS;
 
 export const VOTER_CORRECTION_CATEGORIES: { key: string; label: string }[] = [
     { key: 'correction_name', label: 'Name' },

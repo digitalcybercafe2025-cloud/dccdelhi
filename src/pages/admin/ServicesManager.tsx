@@ -3,7 +3,8 @@ import { Trash2, Plus } from 'lucide-react';
 import api, { getMediaUrl } from '../../api/axios';
 import {
     MASTER_DOCUMENT_LIST,
-    SUBTYPE_PRESETS,
+    GENERAL_SUBTYPE_PRESETS,
+    VOTER_SUBTYPE_PRESETS,
     ServiceDocumentConfig,
 } from '../../constants/documentCatalog';
 
@@ -533,22 +534,30 @@ const ServicesManager: React.FC = () => {
                                             Configure documents per service type / correction option (auto-rendered on Step 2).
                                         </p>
                                     </div>
-                                    <select
-                                        value=""
-                                        onChange={e => {
-                                            const val = e.target.value;
-                                            if (!val) return;
-                                            const preset = SUBTYPE_PRESETS.find(p => p.key === val);
-                                            if (preset) addSubTypeConfig(preset.key, preset.label);
-                                            e.target.value = '';
-                                        }}
-                                        className="px-3 py-1.5 rounded-xl bg-white border border-blue-200 text-blue-700 text-xs font-bold outline-none cursor-pointer"
-                                    >
-                                        <option value="">+ Add Service / Sub-Type Preset...</option>
-                                        {SUBTYPE_PRESETS.map(p => (
-                                            <option key={p.key} value={p.key}>{p.label}</option>
-                                        ))}
-                                    </select>
+                                    {(() => {
+                                        const isVoterService = /voter/i.test(form.title || '');
+                                        const activePresets = isVoterService ? VOTER_SUBTYPE_PRESETS : GENERAL_SUBTYPE_PRESETS;
+                                        return (
+                                            <select
+                                                value=""
+                                                onChange={e => {
+                                                    const val = e.target.value;
+                                                    if (!val) return;
+                                                    const preset = activePresets.find(p => p.key === val);
+                                                    if (preset) addSubTypeConfig(preset.key, preset.label);
+                                                    e.target.value = '';
+                                                }}
+                                                className="px-3 py-1.5 rounded-xl bg-white border border-blue-200 text-blue-700 text-xs font-bold outline-none cursor-pointer"
+                                            >
+                                                <option value="">
+                                                    {isVoterService ? '+ Add Voter Form / Sub-Type...' : '+ Add Type (New / Correction)...'}
+                                                </option>
+                                                {activePresets.map(p => (
+                                                    <option key={p.key} value={p.key}>{p.label}</option>
+                                                ))}
+                                            </select>
+                                        );
+                                    })()}
                                 </div>
 
                                 {/* Custom Sub-Type Adder */}
