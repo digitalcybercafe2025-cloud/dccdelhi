@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Eye, EyeOff } from 'lucide-react';
 import api from '../../api/axios';
 
 const AdminLogin: React.FC = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const navigate = useNavigate();
@@ -14,13 +16,19 @@ const AdminLogin: React.FC = () => {
         setLoading(true);
         setError('');
         try {
-            const res = await api.post('/admin/login', { email, password });
+            const res = await api.post('/admin/login', { email: email.trim(), password });
             localStorage.setItem('mangolpuri_admin_token', res.data.token);
             localStorage.setItem('mangolpuri_admin_role', res.data.role);
             localStorage.setItem('mangolpuri_admin_email', res.data.email);
             navigate('/admin/dashboard', { replace: true });
-        } catch {
-            setError('Invalid credentials. Please try again.');
+        } catch (err: any) {
+            if (!err?.response) {
+                setError('Server is waking up or unreachable. Please wait 20 seconds and try again.');
+            } else if (err.response.status === 429) {
+                setError('Too many login attempts. Please wait a few minutes and try again.');
+            } else {
+                setError(err.response?.data?.message || 'Invalid credentials. Please try again.');
+            }
         } finally {
             setLoading(false);
         }
@@ -57,14 +65,24 @@ const AdminLogin: React.FC = () => {
                         </div>
                         <div>
                             <label className="text-xs font-black text-slate-400 uppercase tracking-widest block mb-2">Password</label>
-                            <input
-                                type="password"
-                                value={password}
-                                onChange={e => setPassword(e.target.value)}
-                                required
-                                placeholder="••••••••"
-                                className="w-full px-4 py-3.5 rounded-xl bg-white/10 border border-white/10 text-white placeholder:text-slate-500 font-bold text-sm outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
-                            />
+                            <div className="relative">
+                                <input
+                                    type={showPassword ? 'text' : 'password'}
+                                    value={password}
+                                    onChange={e => setPassword(e.target.value)}
+                                    required
+                                    placeholder="••••••••"
+                                    className="w-full px-4 py-3.5 pr-11 rounded-xl bg-white/10 border border-white/10 text-white placeholder:text-slate-500 font-bold text-sm outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(prev => !prev)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors p-1"
+                                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                                >
+                                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                </button>
+                            </div>
                         </div>
 
                         {error && (

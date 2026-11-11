@@ -39,10 +39,16 @@ const avatarUpload = multer({
 // @route   POST /api/admin/login
 // @access  Public
 const authAdmin = async (req, res) => {
-    const { email, password } = req.body;
+    const cleanEmail = String(req.body.email || '').trim();
+    const password = String(req.body.password || '');
+
+    if (!cleanEmail || !password) {
+        return res.status(400).json({ message: 'Admin ID/Email and password are required' });
+    }
 
     try {
-        const admin = await Admin.findOne({ email });
+        const escaped = cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const admin = await Admin.findOne({ email: { $regex: new RegExp(`^${escaped}$`, 'i') } });
 
         if (admin && (await admin.matchPassword(password))) {
             res.json({
