@@ -11,7 +11,8 @@ const settingsSchema = new mongoose.Schema({
     instagramUrl: { type: String, default: '' },
     facebookUrl: { type: String, default: '' },
     upiId: { type: String, default: '8445221632@upi' },
-    upiPayeeName: { type: String, default: 'Digital Cyber Cafe' }
+    upiPayeeName: { type: String, default: 'Digital Cyber Cafe' },
+    adminInviteCodeHash: { type: String, select: false }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Settings', settingsSchema);

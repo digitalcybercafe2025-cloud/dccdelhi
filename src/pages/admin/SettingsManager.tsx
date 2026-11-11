@@ -11,8 +11,14 @@ const SettingsManager: React.FC = () => {
         upiId: '8445221632@upi', upiPayeeName: 'Digital Cyber Cafe'
     });
     const [profileForm, setProfileForm] = useState({
-        name: '', email: '', currentPassword: '', newPassword: '', avatar: ''
+        name: '', email: '', mobile: '', currentPassword: '', newPassword: '', newRecoveryPin: '', avatar: ''
     });
+    const [originalProfile, setOriginalProfile] = useState({ email: '', mobile: '' });
+    const [hasRecoveryPin, setHasRecoveryPin] = useState(false);
+    const [hasInviteCode, setHasInviteCode] = useState(false);
+    const [inviteForm, setInviteForm] = useState({ inviteCode: '', currentPassword: '' });
+    const [inviteSaving, setInviteSaving] = useState(false);
+    const [inviteSavedMsg, setInviteSavedMsg] = useState('');
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
@@ -20,11 +26,16 @@ const SettingsManager: React.FC = () => {
     const [profileSaved, setProfileSaved] = useState(false);
     const [uploadingAvatar, setUploadingAvatar] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const isSuperAdmin = (localStorage.getItem('mangolpuri_admin_role') || 'admin') === 'admin';
 
     useEffect(() => {
         const load = async () => {
             try {
-                const [sRes, aRes] = await Promise.all([api.get('/settings'), api.get('/auth/me')]);
+                const reqs: Promise<any>[] = [api.get('/settings'), api.get('/auth/me')];
+                if (isSuperAdmin) {
+                    reqs.push(api.get('/admin/security-config').catch(() => ({ data: null })));
+                }
+                const [sRes, aRes, secRes] = await Promise.all(reqs);
                 if (sRes.data?.data) {
                     setForm(sRes.data.data);
                 }
@@ -34,14 +45,23 @@ const SettingsManager: React.FC = () => {
                         ...p,
                         name: profileData.name || '',
                         email: profileData.email || '',
+                        mobile: profileData.mobile || '',
                         avatar: profileData.avatar || ''
                     }));
+                    setOriginalProfile({
+                        email: profileData.email || '',
+                        mobile: profileData.mobile || ''
+                    });
+                    setHasRecoveryPin(Boolean(profileData.hasRecoveryPin));
+                }
+                if (secRes?.data) {
+                    setHasInviteCode(Boolean(secRes.data.hasInviteCode));
                 }
             } catch (e) { console.error(e); }
             finally { setLoading(false); }
         };
         load();
-    }, []);
+    }, [isSuperAdmin]);
 
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault(); setSaving(true); setSaved(false);
@@ -58,7 +78,8 @@ const SettingsManager: React.FC = () => {
         try {
             const res = await api.put('/auth/profile', profileForm);
             setProfileSaved(true);
-            setProfileForm(p => ({ ...p, currentPassword: '', newPassword: '' })); // Clear passwords after success
+            setProfileForm(p => ({ ...p, currentPassword: '', newPassword: '', newRecoveryPin: '' }));
+            if (res.data?.hasRecoveryPin !== undefined) setHasRecoveryPin(Boolean(res.data.hasRecoveryPin));
 
             // Sync new name/role/avatar to localStorage so the header can pick it up
             if (res.data) {
@@ -72,6 +93,23 @@ const SettingsManager: React.FC = () => {
             alert(err.response?.data?.message || 'Failed to update profile');
         }
         finally { setProfileSaving(false); }
+    };
+
+    const handleInviteSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setInviteSaving(true);
+        setInviteSavedMsg('');
+        try {
+            const res = await api.put('/admin/security-config', inviteForm);
+            setHasInviteCode(Boolean(res.data?.hasInviteCode));
+            setInviteForm({ inviteCode: '', currentPassword: '' });
+            setInviteSavedMsg(res.data?.message || 'Security Invite Code updated!');
+            setTimeout(() => setInviteSavedMsg(''), 4000);
+        } catch (err: any) {
+            alert(err.response?.data?.message || 'Failed to update security invite code');
+        } finally {
+            setInviteSaving(false);
+        }
     };
 
     const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -157,16 +195,56 @@ const SettingsManager: React.FC = () => {
                             <input value={profileForm.name} onChange={e => setProfileForm(p => ({ ...p, name: e.target.value }))} className={inputCls} />
                         </div>
                         <div>
-                            <label className={labelCls}>Login Email</label>
+                            <label className={labelCls}>Login ID / Email</label>
                             <input value={profileForm.email} onChange={e => setProfileForm(p => ({ ...p, email: e.target.value }))} className={inputCls} />
                         </div>
                         <div>
+                            <label className={labelCls}>Registered Mobile (10 Digits)</label>
+                            <input
+                                type="tel"
+                                maxLength={10}
+                                value={profileForm.mobile}
+                                onChange={e => setProfileForm(p => ({ ...p, mobile: e.target.value.replace(/[^0-9]/g, '') }))}
+                                placeholder="e.g. 9911423881"
+                                className={inputCls}
+                            />
+                        </div>
+                        <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">6-Digit Recovery PIN</label>
+                                <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${hasRecoveryPin ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
+                                    {hasRecoveryPin ? 'PIN Active' : 'Not Set'}
+                                </span>
+                            </div>
+                            <input
+                                type="password"
+                                inputMode="numeric"
+                                maxLength={6}
+                                value={profileForm.newRecoveryPin}
+                                onChange={e => setProfileForm(p => ({ ...p, newRecoveryPin: e.target.value.replace(/[^0-9]/g, '') }))}
+                                placeholder={hasRecoveryPin ? 'Enter 6 digits to change PIN' : 'Set 6-digit PIN for Forgot Password'}
+                                className={inputCls}
+                            />
+                        </div>
+                        <div>
                             <label className={labelCls}>Current Password</label>
-                            <input type="password" required={!!profileForm.newPassword || profileForm.email !== ''} value={profileForm.currentPassword} onChange={e => setProfileForm(p => ({ ...p, currentPassword: e.target.value }))} placeholder="Required to save changes" className={inputCls} />
+                            <input
+                                type="password"
+                                required={
+                                    Boolean(profileForm.newPassword) ||
+                                    Boolean(profileForm.newRecoveryPin) ||
+                                    profileForm.email !== originalProfile.email ||
+                                    profileForm.mobile !== originalProfile.mobile
+                                }
+                                value={profileForm.currentPassword}
+                                onChange={e => setProfileForm(p => ({ ...p, currentPassword: e.target.value }))}
+                                placeholder="Required for email/mobile/PIN/password"
+                                className={inputCls}
+                            />
                         </div>
                         <div>
                             <label className={labelCls}>New Password (Optional)</label>
-                            <input type="password" value={profileForm.newPassword} onChange={e => setProfileForm(p => ({ ...p, newPassword: e.target.value }))} placeholder="Leave blank to keep current" className={inputCls} />
+                            <input type="password" value={profileForm.newPassword} onChange={e => setProfileForm(p => ({ ...p, newPassword: e.target.value }))} placeholder="Min 8 chars (letters + numbers)" className={inputCls} />
                         </div>
                         <button type="submit" disabled={profileSaving} className="w-full py-3.5 bg-slate-800 hover:bg-black text-white rounded-xl font-black text-[10px] uppercase tracking-[0.2em] transition-all disabled:opacity-50">
                             {profileSaving ? 'Updating...' : 'Update Credentials'}
@@ -175,7 +253,50 @@ const SettingsManager: React.FC = () => {
                     </form>
                 </div>
 
-                <button onClick={() => { localStorage.clear(); window.location.href = '/login'; }} className="w-full p-5 bg-red-50 hover:bg-red-100 text-red-500 rounded-3xl flex items-center justify-between group transition-all">
+                {isSuperAdmin && (
+                    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 space-y-4 border-b-4 border-b-emerald-500/10">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">Team Sign-Up Security Code</h3>
+                                <p className="text-[10px] text-slate-400 font-bold mt-0.5">Required to register new staff accounts</p>
+                            </div>
+                            <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-full ${hasInviteCode ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'}`}>
+                                {hasInviteCode ? 'Configured' : 'Not Set'}
+                            </span>
+                        </div>
+                        <form onSubmit={handleInviteSubmit} className="space-y-3">
+                            <div>
+                                <label className={labelCls}>New Security Invite Code (Min 6 chars)</label>
+                                <input
+                                    type="password"
+                                    required
+                                    minLength={6}
+                                    value={inviteForm.inviteCode}
+                                    onChange={e => setInviteForm(f => ({ ...f, inviteCode: e.target.value }))}
+                                    placeholder="Set secret code for staff signup"
+                                    className={inputCls}
+                                />
+                            </div>
+                            <div>
+                                <label className={labelCls}>Your Current Password</label>
+                                <input
+                                    type="password"
+                                    required
+                                    value={inviteForm.currentPassword}
+                                    onChange={e => setInviteForm(f => ({ ...f, currentPassword: e.target.value }))}
+                                    placeholder="Confirm admin password"
+                                    className={inputCls}
+                                />
+                            </div>
+                            <button type="submit" disabled={inviteSaving} className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-[10px] uppercase tracking-[0.2em] transition-all disabled:opacity-50">
+                                {inviteSaving ? 'Saving...' : hasInviteCode ? 'Update Security Code' : 'Activate Security Code'}
+                            </button>
+                            {inviteSavedMsg && <p className="text-[10px] font-black text-emerald-600 text-center uppercase tracking-wider">{inviteSavedMsg}</p>}
+                        </form>
+                    </div>
+                )}
+
+                <button onClick={() => { localStorage.clear(); window.location.href = '/admin'; }} className="w-full p-5 bg-red-50 hover:bg-red-100 text-red-500 rounded-3xl flex items-center justify-between group transition-all">
                     <span className="font-black text-sm uppercase tracking-widest">Logout Admin</span>
                     <svg className="group-hover:translate-x-1 transition-transform" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" /></svg>
                 </button>

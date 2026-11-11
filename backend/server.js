@@ -13,6 +13,7 @@ mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/digital_cyb
     .catch(err => console.error('❌ MongoDB Connection Error:', err));
 
 const app = express();
+app.set('trust proxy', 1);
 
 // Rate Limiting
 const limiter = rateLimit({
