@@ -62,12 +62,12 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({ service, onApply }) =>
       {/* ── Card Body ── */}
       <div className="px-2 pt-2 pb-2 md:px-4 md:pt-3 md:pb-4 flex flex-col flex-1">
 
-        {/* Title + shield icon */}
+        {/* Title + golden shield icon */}
         <div className="flex items-start justify-between gap-2 mb-1.5">
           <h3 className="text-[12px] md:text-[15px] font-black text-slate-900 dark:text-white leading-snug tracking-tight line-clamp-1">
             {service.title}
           </h3>
-          <ShieldCheck className="w-4 h-4 text-slate-200 dark:text-slate-700 shrink-0 mt-0.5" />
+          <ShieldCheck className="w-4 h-4 text-amber-500 fill-amber-400/25 dark:text-amber-400 dark:fill-amber-400/20 drop-shadow-[0_1px_2px_rgba(245,158,11,0.3)] shrink-0 mt-0.5" />
         </div>
 
         {/* Description */}

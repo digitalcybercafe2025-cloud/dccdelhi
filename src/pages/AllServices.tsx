@@ -56,15 +56,15 @@ export const AllServices: React.FC = () => {
     }
 
     return (
-        <div className="min-h-screen transition-colors duration-500 pt-24 pb-12 px-6" style={{ backgroundColor: 'var(--app-bg)' }}>
+        <div className="min-h-screen transition-colors duration-500 pt-5 md:pt-7 pb-12 px-4 md:px-6" style={{ backgroundColor: 'var(--app-bg)' }}>
             <div className="max-w-[1500px] mx-auto">
-                <div className="mb-12">
-                    <div className="flex items-center gap-4 mb-4">
-                        <span className="w-10 h-1 bg-brand dark:bg-emerald-500 rounded-full"></span>
+                <div className="mb-6 md:mb-8">
+                    <div className="flex items-center gap-3 mb-2">
+                        <span className="w-8 h-1 bg-brand dark:bg-emerald-500 rounded-full"></span>
                         <span className="text-[10px] font-black text-brand dark:text-emerald-400 uppercase tracking-[0.2em]">Full Portfolio</span>
                     </div>
-                    <h2 className="text-3xl md:text-5xl font-black text-slate-900 dark:text-white mb-4 tracking-tighter">All Services</h2>
-                    <p className="text-slate-500 dark:text-slate-400 font-bold text-lg leading-relaxed max-w-2xl">Browse our complete catalog of government and digital services.</p>
+                    <h2 className="text-2xl md:text-4xl font-black text-slate-900 dark:text-white mb-1.5 tracking-tighter">All Services</h2>
+                    <p className="text-slate-500 dark:text-slate-400 font-bold text-sm md:text-base leading-relaxed max-w-2xl">Browse our complete catalog of government and digital services.</p>
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-8">
