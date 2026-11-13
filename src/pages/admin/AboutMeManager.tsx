@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import api from '../../api/axios';
+import api, { getMediaUrl } from '../../api/axios';
 import { User, Image as ImageIcon, Briefcase, Plus, X, ShieldCheck, Sparkles, MapPin, Phone } from 'lucide-react';
 
 const labelCls = 'text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5';
@@ -72,11 +72,22 @@ const AboutMeManager: React.FC = () => {
             if (selectedFile) {
                 formData.append('image', selectedFile);
             }
+            if (form.imageUrl) {
+                formData.append('imageUrl', form.imageUrl);
+            }
 
             const res = await api.put('/about', formData);
 
-            if (res.data?.data?.imageUrl) {
-                setForm(f => ({ ...f, imageUrl: res.data.data.imageUrl }));
+            if (res.data?.data) {
+                const updated = res.data.data;
+                setForm(f => ({
+                    ...f,
+                    ...updated,
+                    imageUrl: updated.imageUrl || f.imageUrl
+                }));
+                if (updated.imageUrl) {
+                    setPreviewUrl(null);
+                }
             }
             setSelectedFile(null);
 
@@ -123,7 +134,7 @@ const AboutMeManager: React.FC = () => {
         </div>
     );
 
-    const displayImage = previewUrl || (form.imageUrl.startsWith('/') ? `http://127.0.0.1:5000${form.imageUrl}` : form.imageUrl);
+    const displayImage = previewUrl || (form.imageUrl ? getMediaUrl(form.imageUrl) : '');
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start pb-20 animate-in fade-in duration-500">
@@ -133,7 +144,14 @@ const AboutMeManager: React.FC = () => {
                     <div className="p-8 text-center flex flex-col items-center relative">
                         <div className="w-48 h-48 rounded-full border-4 border-white shadow-xl overflow-hidden mb-6 relative group bg-slate-100 flex items-center justify-center">
                             {displayImage ? (
-                                <img src={displayImage} className="w-full h-full object-cover" alt="Profile" />
+                                <img
+                                    src={displayImage}
+                                    className="w-full h-full object-cover"
+                                    alt="Profile"
+                                    onError={(e) => {
+                                        (e.currentTarget as HTMLImageElement).src = 'https://img.freepik.com/free-photo/handsome-young-man-with-new-hairstyle-wearing-blue-shirt-feeling-confident-isolated-white-background_176532-8097.jpg';
+                                    }}
+                                />
                             ) : (
                                 <User className="w-20 h-20 text-slate-300" />
                             )}
@@ -155,6 +173,20 @@ const AboutMeManager: React.FC = () => {
                         >
                             Change Profile Image
                         </button>
+
+                        <div className="mt-3 w-full text-left">
+                            <label className={labelCls}>Or Image URL / Cloud Link</label>
+                            <input
+                                type="text"
+                                value={form.imageUrl}
+                                onChange={e => {
+                                    setForm(f => ({ ...f, imageUrl: e.target.value }));
+                                    setPreviewUrl(null);
+                                }}
+                                placeholder="https://... or /uploads/..."
+                                className="w-full px-3 py-2 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-700 outline-none focus:border-blue-400 font-medium"
+                            />
+                        </div>
 
                         <div className="mt-6 w-full text-left space-y-3">
                             <h2 className="text-xl font-black text-slate-800 tracking-tight text-center">{form.title || 'Your Name'}</h2>

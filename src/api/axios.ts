@@ -24,12 +24,22 @@ const api = axios.create({
     }
 });
 
-// Add a request interceptor to add the auth token
+// Add a request interceptor to add the auth token and ensure proper multipart headers
 api.interceptors.request.use(
     (config) => {
         const token = localStorage.getItem('mangolpuri_admin_token');
         if (token) {
             config.headers['Authorization'] = `Bearer ${token}`;
+        }
+        // When sending FormData, delete explicit Content-Type so Axios & browser can set multipart boundary
+        if (config.data instanceof FormData && config.headers) {
+            if (typeof (config.headers as any).delete === 'function') {
+                (config.headers as any).delete('Content-Type');
+                (config.headers as any).delete('content-type');
+            } else {
+                delete (config.headers as any)['Content-Type'];
+                delete (config.headers as any)['content-type'];
+            }
         }
         return config;
     },

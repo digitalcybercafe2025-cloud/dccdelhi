@@ -9,11 +9,15 @@ import { ApplyService } from './src/pages/ApplyService';
 import { TrackApplication } from './src/pages/TrackApplication';
 import { AboutUs } from './components/AboutUs';
 import { ThemeColor, AboutContent, Enquiry, EnquiryStatus } from './types';
-import { MessageCircle, MapPin, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { sendWhatsAppNotification, formatMessageFromTemplate } from './services/whatsappService';
 import api from './src/api/axios';
 import AdminLogin from './src/pages/admin/AdminLogin';
 import AdminLayout from './src/pages/admin/AdminLayout';
+import { Footer } from './components/Footer';
+import { PrivacyPolicy } from './src/pages/PrivacyPolicy';
+import { TermsConditions } from './src/pages/TermsConditions';
+import { Disclaimer } from './src/pages/Disclaimer';
 
 const App: React.FC = () => {
   const [darkMode, setDarkMode] = useState(() => {
@@ -41,6 +45,10 @@ const App: React.FC = () => {
 
   const navigate = useNavigate();
   const location = useLocation();
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [location.pathname]);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme") || "light";
@@ -155,6 +163,9 @@ const App: React.FC = () => {
           <Route path="/apply/:id" element={<ApplyService />} />
           <Route path="/track" element={<TrackApplication />} />
           <Route path="/about" element={<AboutUs content={aboutContent} onSendEnquiry={handleSendEnquiry} />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/terms-and-conditions" element={<TermsConditions />} />
+          <Route path="/disclaimer" element={<Disclaimer />} />
           {/* Admin Panel Routes */}
           <Route path="/admin" element={<AdminLogin />} />
           <Route path="/admin/*" element={<AdminLayout />} />
@@ -162,43 +173,7 @@ const App: React.FC = () => {
       </main>
 
       {!isHiddenLayout && (
-        <footer className="border-t border-slate-200 dark:border-white/5 py-8 px-8 pb-32 md:pb-8 transition-colors duration-500" style={{ backgroundColor: 'var(--section-bg)' }}>
-          <div className="max-w-[1500px] mx-auto grid grid-cols-1 md:grid-cols-4 gap-8">
-            <div className="md:col-span-2">
-              <div className="flex items-center gap-3 mb-3">
-                <img src="/digital-india-logo.png" className="h-9 w-auto object-contain" alt="Digital India" />
-                <div className="h-6 w-[1.5px] bg-slate-200 dark:bg-white/10 mx-1" />
-                <span className="font-black text-xl tracking-tighter leading-none" style={{ color: 'var(--text-primary)' }}>Digital Cyber Cafe</span>
-              </div>
-              <p className="text-slate-500 dark:text-slate-400 max-w-sm mb-3 font-bold text-xs leading-relaxed">Official assistance for Aadhaar, PAN, Passport, and Academic documentation. Bridging the digital divide with security and speed.</p>
-            </div>
-
-            <div className="space-y-3">
-              <h4 className="text-[9px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Connect</h4>
-              <ul className="space-y-1.5">
-                <li className="flex items-center gap-2.5 text-slate-500 dark:text-slate-400 font-bold text-xs hover:text-brand dark:hover:text-emerald-400 cursor-pointer transition-colors"><MessageCircle className="w-3.5 h-3.5" /> WhatsApp Support</li>
-                <li className="flex items-center gap-2.5 text-slate-500 dark:text-slate-400 font-bold text-xs hover:text-brand dark:hover:text-emerald-400 cursor-pointer transition-colors"><MapPin className="w-3.5 h-3.5" /> Find Our Hub</li>
-              </ul>
-            </div>
-
-            <div className="space-y-3">
-              <h4 className="text-[9px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Status</h4>
-              <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-100 dark:border-emerald-500/20">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-[8px] font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-widest">Servers Online</span>
-                </div>
-                <p className="text-[10px] font-bold text-emerald-800/60 dark:text-emerald-400/60 leading-tight">Optimal processing throughput.</p>
-              </div>
-            </div>
-          </div>
-          <div className="max-w-[1500px] mx-auto mt-6 pt-4 border-t border-slate-200 dark:border-white/5 text-center">
-            <span className="text-slate-400 font-bold text-[9px] tracking-tight flex items-center justify-center gap-1">
-              <span className="copyright-glow cursor-default" onMouseDown={() => { longPressTimer.current = window.setTimeout(() => setShowLoginModal(true), 3000); }} onMouseUp={() => { if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; } }}>©</span>
-              {new Date().getFullYear()} Digital Cyber Cafe mangolpuri • Powered by SevaCore
-            </span>
-          </div>
-        </footer>
+        <Footer onSecretAdminAuth={() => setShowLoginModal(true)} />
       )}
 
       {showLoginModal && (

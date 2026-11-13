@@ -10,14 +10,28 @@ import { SERVICES, MESSAGES, TESTIMONIALS } from '../../constants';
 import { Link } from 'react-router-dom';
 import api from '../api/axios';
 
+// In-memory persistent cache across route transitions
+const cachedHomeData: {
+    services: Service[] | null;
+    messages: any[] | null;
+    slides: any[] | null;
+    testimonials: Testimonial[] | null;
+} = {
+    services: null,
+    messages: null,
+    slides: null,
+    testimonials: null,
+};
+
 export const Home: React.FC = () => {
     const navigate = useNavigate();
-    const [services, setServices] = useState<Service[]>(() => SERVICES.slice(0, 8));
-    const [messages, setMessages] = useState<Message[]>(() => MESSAGES);
-    const [slides, setSlides] = useState<any[]>([]);
-    const [testimonials, setTestimonials] = useState<Testimonial[]>(() => TESTIMONIALS);
+    const [services, setServices] = useState<Service[]>(() => cachedHomeData.services || SERVICES.slice(0, 8));
+    const [messages, setMessages] = useState<any[]>(() => cachedHomeData.messages || MESSAGES);
+    const [slides, setSlides] = useState<any[]>(() => cachedHomeData.slides || []);
+    const [testimonials, setTestimonials] = useState<Testimonial[]>(() => cachedHomeData.testimonials || TESTIMONIALS);
 
     useEffect(() => {
+        let isMounted = true;
         const fetchHomeData = async () => {
             try {
                 const [svcRes, testRes, slideRes, noticeRes] = await Promise.allSettled([
@@ -27,8 +41,10 @@ export const Home: React.FC = () => {
                     api.get('/hero/notices/active')
                 ]);
 
-                if (svcRes.status === 'fulfilled' && svcRes.value?.data?.success && Array.isArray(svcRes.value.data.data)) {
-                    setServices(svcRes.value.data.data.slice(0, 8));
+                if (svcRes.status === 'fulfilled' && svcRes.value?.data?.success && Array.isArray(svcRes.value.data.data) && svcRes.value.data.data.length > 0) {
+                    const svcList = svcRes.value.data.data.slice(0, 8);
+                    cachedHomeData.services = svcList;
+                    if (isMounted) setServices(svcList);
                 }
 
                 if (testRes.status === 'fulfilled' && testRes.value?.data?.success && Array.isArray(testRes.value.data.data) && testRes.value.data.data.length > 0) {
@@ -42,14 +58,19 @@ export const Home: React.FC = () => {
                         status: t.active !== false,
                         display_order: t.order || 0
                     }));
-                    setTestimonials(mapped);
+                    if (mapped.length > 0) {
+                        cachedHomeData.testimonials = mapped;
+                        if (isMounted) setTestimonials(mapped);
+                    }
                 }
 
                 if (slideRes.status === 'fulfilled' && slideRes.value?.data?.success && Array.isArray(slideRes.value.data.data) && slideRes.value.data.data.length > 0) {
-                    setSlides(slideRes.value.data.data);
+                    cachedHomeData.slides = slideRes.value.data.data;
+                    if (isMounted) setSlides(slideRes.value.data.data);
                 }
                 if (noticeRes.status === 'fulfilled' && noticeRes.value?.data?.success && Array.isArray(noticeRes.value.data.data) && noticeRes.value.data.data.length > 0) {
-                    setMessages(noticeRes.value.data.data);
+                    cachedHomeData.messages = noticeRes.value.data.data;
+                    if (isMounted) setMessages(noticeRes.value.data.data);
                 }
             } catch (error) {
                 console.error("Failed to fetch home data", error);
@@ -57,6 +78,7 @@ export const Home: React.FC = () => {
         };
 
         fetchHomeData();
+        return () => { isMounted = false; };
     }, []);
 
     return (

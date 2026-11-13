@@ -8,6 +8,7 @@ const SettingsManager: React.FC = () => {
     const [form, setForm] = useState({
         siteName: '', contactNumber: '', whatsapp: '', email: '',
         address: '', slogan: '', footerText: '', instagramUrl: '', facebookUrl: '',
+        threadsUrl: '', twitterUrl: '', youtubeUrl: '', googleMapsUrl: '',
         upiId: '8445221632@upi', upiPayeeName: 'Digital Cyber Cafe'
     });
     const [profileForm, setProfileForm] = useState({
@@ -333,6 +334,7 @@ const SettingsManager: React.FC = () => {
                         </div>
                         <Field label="Support Email" field="email" type="email" />
                         <Field label="Physical HQ Address" field="address" />
+                        <Field label="Google Maps Location URL (Find Our Hub)" field="googleMapsUrl" type="url" placeholder="https://maps.google.com/?q=..." />
                     </div>
 
                     {/* UPI & Payment Settings */}
@@ -360,8 +362,11 @@ const SettingsManager: React.FC = () => {
                             <h3 className="font-black text-slate-800 text-base uppercase tracking-tight">Social Presence</h3>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                            <Field label="Instagram URL" field="instagramUrl" type="url" />
-                            <Field label="Facebook Page" field="facebookUrl" type="url" />
+                            <Field label="Instagram URL" field="instagramUrl" type="url" placeholder="https://instagram.com/..." />
+                            <Field label="Facebook Page" field="facebookUrl" type="url" placeholder="https://facebook.com/..." />
+                            <Field label="Threads Profile" field="threadsUrl" type="url" placeholder="https://threads.net/@..." />
+                            <Field label="X / Twitter Profile" field="twitterUrl" type="url" placeholder="https://x.com/..." />
+                            <Field label="YouTube Channel (Right of WhatsApp)" field="youtubeUrl" type="url" placeholder="https://youtube.com/@..." />
                         </div>
                     </div>
 

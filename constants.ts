@@ -170,9 +170,27 @@ export const TESTIMONIALS: Testimonial[] = [
   }
 ];
 
-export const MESSAGES: Message[] = [
-  { id: '1', text: 'Important: Voter ID corrections end this week. Apply now!', active: true, type: 'urgent' },
-  { id: '2', text: 'Special Discount: 20% off on GST registrations.', active: true, type: 'promo' }
+export const MESSAGES: any[] = [
+  {
+    id: '1',
+    title: 'HAPPY DIWALI ✨ OFFERS',
+    description: 'दिवाली के इस अवसर पर हर फ़ॉर्म अभी ₹50 की छूट में भरें। यह ऑफ़र केवल सीमित दिनों के लिए मान्य है।',
+    icon: '🪔',
+    badge: 'LIVE',
+    active: true,
+    status: true,
+    type: 'Special'
+  },
+  {
+    id: '2',
+    title: 'TODAY OFFER ! PAN CARD MADE ₹199 ONLY',
+    description: 'आज ही PAN Card apply करें, सिर्फ ₹199 में। सीमित समय के लिए ऑफर है। जल्द आवेदन करें।',
+    icon: '🪪',
+    badge: 'LIVE',
+    active: true,
+    status: true,
+    type: 'Important'
+  }
 ];
 
 export const CAROUSEL_IMAGES = [

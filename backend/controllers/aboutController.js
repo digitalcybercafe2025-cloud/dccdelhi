@@ -41,9 +41,9 @@ exports.updateAbout = async (req, res) => {
 
         if (req.file) {
             about.imageUrl = `/uploads/${req.file.filename}`;
-        } else if (req.body.imageUrl && req.body.imageUrl !== about.imageUrl) {
+        } else if (req.body.imageUrl !== undefined && req.body.imageUrl.trim() !== '') {
             // allows setting a string URL if no file provided
-            about.imageUrl = req.body.imageUrl;
+            about.imageUrl = req.body.imageUrl.trim();
         }
 
         await about.save();

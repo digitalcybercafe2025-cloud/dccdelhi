@@ -1,5 +1,6 @@
 const HeroSlide = require('../models/HeroSlide');
 const LiveNotice = require('../models/LiveNotice');
+const NoticeSettings = require('../models/NoticeSettings');
 const path = require('path');
 const fs = require('fs');
 
@@ -115,7 +116,7 @@ const deleteSlide = async (req, res) => {
 
 const getNotices = async (req, res) => {
     try {
-        const notices = await LiveNotice.find({}).sort({ order: 1 });
+        const notices = await LiveNotice.find({}).sort({ order: 1, createdAt: -1 });
         res.json({ success: true, data: notices });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -126,9 +127,29 @@ const getActiveNotices = async (req, res) => {
     try {
         const now = new Date();
         const notices = await LiveNotice.find({
-            status: true,
-            $or: [{ expiryDate: { $gt: now } }, { expiryDate: null }]
-        }).sort({ order: 1 });
+            $or: [
+                { status: true },
+                { status: { $exists: false } },
+                { active: true }
+            ],
+            $and: [
+                {
+                    $or: [
+                        { startDate: null },
+                        { startDate: { $exists: false } },
+                        { startDate: { $lte: now } }
+                    ]
+                },
+                {
+                    $or: [
+                        { isLifetime: true },
+                        { expiryDate: null },
+                        { expiryDate: { $exists: false } },
+                        { expiryDate: { $gt: now } }
+                    ]
+                }
+            ]
+        }).sort({ order: 1, createdAt: -1 });
         res.json({ success: true, data: notices });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -137,7 +158,23 @@ const getActiveNotices = async (req, res) => {
 
 const createNotice = async (req, res) => {
     try {
-        const notice = await LiveNotice.create(req.body);
+        const data = { ...req.body };
+        if (req.file) {
+            data.iconImage = `/uploads/hero/${req.file.filename}`;
+            data.iconType = 'image';
+        }
+        if (data.isLifetime === 'true' || data.isLifetime === true) {
+            data.isLifetime = true;
+            data.expiryDate = null;
+        } else if (data.isLifetime === 'false') {
+            data.isLifetime = false;
+        }
+        if (data.status === 'true') data.status = true;
+        if (data.status === 'false') data.status = false;
+        if (data.order !== undefined) data.order = Number(data.order);
+        if (data.startDate === '') data.startDate = null;
+        if (data.expiryDate === '') data.expiryDate = null;
+        const notice = await LiveNotice.create(data);
         res.status(201).json({ success: true, data: notice });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -146,7 +183,23 @@ const createNotice = async (req, res) => {
 
 const updateNotice = async (req, res) => {
     try {
-        const notice = await LiveNotice.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        const data = { ...req.body };
+        if (req.file) {
+            data.iconImage = `/uploads/hero/${req.file.filename}`;
+            data.iconType = 'image';
+        }
+        if (data.isLifetime === 'true' || data.isLifetime === true) {
+            data.isLifetime = true;
+            data.expiryDate = null;
+        } else if (data.isLifetime === 'false') {
+            data.isLifetime = false;
+        }
+        if (data.status === 'true') data.status = true;
+        if (data.status === 'false') data.status = false;
+        if (data.order !== undefined) data.order = Number(data.order);
+        if (data.startDate === '') data.startDate = null;
+        if (data.expiryDate === '') data.expiryDate = null;
+        const notice = await LiveNotice.findByIdAndUpdate(req.params.id, data, { new: true });
         if (!notice) return res.status(404).json({ success: false, message: 'Notice not found' });
         res.json({ success: true, data: notice });
     } catch (error) {
@@ -164,7 +217,53 @@ const deleteNotice = async (req, res) => {
     }
 };
 
+const duplicateNotice = async (req, res) => {
+    try {
+        const original = await LiveNotice.findById(req.params.id);
+        if (!original) return res.status(404).json({ success: false, message: 'Notice not found' });
+        const copyData = original.toObject();
+        delete copyData._id;
+        delete copyData.createdAt;
+        delete copyData.updatedAt;
+        copyData.title = `${copyData.title} (Copy)`;
+        copyData.order = (original.order || 0) + 1;
+        const duplicated = await LiveNotice.create(copyData);
+        res.status(201).json({ success: true, data: duplicated });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// ── Notice Settings (Animation & Display) ────────────────────────────────────
+
+const getNoticeSettings = async (req, res) => {
+    try {
+        let settings = await NoticeSettings.findOne();
+        if (!settings) {
+            settings = await NoticeSettings.create({});
+        }
+        res.json({ success: true, data: settings });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+const updateNoticeSettings = async (req, res) => {
+    try {
+        let settings = await NoticeSettings.findOne();
+        if (!settings) {
+            settings = new NoticeSettings();
+        }
+        Object.assign(settings, req.body);
+        await settings.save();
+        res.json({ success: true, data: settings });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
 module.exports = {
     getSlides, getActiveSlides, createSlide, updateSlide, deleteSlide,
-    getNotices, getActiveNotices, createNotice, updateNotice, deleteNotice
+    getNotices, getActiveNotices, createNotice, updateNotice, deleteNotice,
+    duplicateNotice, getNoticeSettings, updateNoticeSettings
 };

@@ -3,8 +3,10 @@ import {
   Phone, MapPin, Code, Smartphone, BarChart3,
   Cpu, Briefcase, Layers, X, Send, CheckCircle2, Loader2, Mail, ShieldCheck, Sparkles, User, ExternalLink
 } from 'lucide-react';
-import api from '../src/api/axios';
+import api, { getMediaUrl } from '../src/api/axios';
 import { AboutContent, Enquiry } from '../types';
+
+let cachedAboutData: AboutContent | null = null;
 
 interface AboutUsProps {
   content?: AboutContent;
@@ -22,13 +24,17 @@ export const AboutUs: React.FC<AboutUsProps> = ({ content, onSendEnquiry }) => {
     email: '',
     message: ''
   });
-  const [fetchedContent, setFetchedContent] = useState<AboutContent | null>(null);
+  const [fetchedContent, setFetchedContent] = useState<AboutContent | null>(cachedAboutData);
 
   useEffect(() => {
-    // Unconditionally fetch to ensure we always have the latest data from the admin panel
+    let isMounted = true;
     api.get('/about').then(res => {
-      if (res.data?.data) setFetchedContent(res.data.data);
+      if (res.data?.data && isMounted) {
+        cachedAboutData = res.data.data;
+        setFetchedContent(res.data.data);
+      }
     }).catch(console.error);
+    return () => { isMounted = false; };
   }, []);
 
   const defaultContent: AboutContent = {
@@ -108,11 +114,14 @@ export const AboutUs: React.FC<AboutUsProps> = ({ content, onSendEnquiry }) => {
 
         {/* Left Column: Profile & Contact */}
         <div className="md:w-1/3 p-6 md:p-8 flex flex-col items-center text-center border-r border-slate-200 dark:border-white/5 relative" style={{ backgroundColor: 'var(--card-bg)' }}>
-          <div className="w-40 h-40 md:w-56 md:h-56 rounded-full border-4 border-white dark:border-slate-800 shadow-xl overflow-hidden mb-6 relative group">
+          <div className="w-40 h-40 md:w-56 md:h-56 rounded-full border-4 border-white dark:border-slate-800 shadow-xl overflow-hidden mb-6 relative group bg-slate-100 dark:bg-slate-800">
             <img
-              src={activeContent.imageUrl?.startsWith('/') ? `${window.location.protocol}//${window.location.hostname}:5000${activeContent.imageUrl}` : activeContent.imageUrl}
+              src={getMediaUrl(activeContent.imageUrl) || defaultContent.imageUrl}
               alt={activeContent.title}
               className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).src = defaultContent.imageUrl;
+              }}
             />
           </div>
 

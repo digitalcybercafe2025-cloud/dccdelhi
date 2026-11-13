@@ -10,9 +10,11 @@ interface TestimonialSectionProps {
 }
 
 export const TestimonialSection: React.FC<TestimonialSectionProps> = ({ testimonials }) => {
-  const activeTestimonials = testimonials
+  const filtered = (testimonials || [])
     .filter(t => (t as any).status !== undefined ? (t as any).status : (t as any).active)
     .sort((a, b) => ((a as any).display_order || (a as any).order || 0) - ((b as any).display_order || (b as any).order || 0));
+
+  const activeTestimonials = filtered.length > 0 ? filtered : (testimonials || []);
 
   if (activeTestimonials.length === 0) return null;
 
@@ -157,7 +159,7 @@ export const TestimonialSection: React.FC<TestimonialSectionProps> = ({ testimon
           <Swiper
             modules={[Autoplay, Navigation, Pagination]}
             spaceBetween={30}
-            loop={true}
+            loop={activeTestimonials.length > 3}
             speed={800}
             autoplay={{
               delay: 5000,

@@ -18,7 +18,11 @@ const getSettings = async (req, res) => {
 // @route PUT /api/settings
 const updateSettings = async (req, res) => {
     try {
-        const { siteName, contactNumber, whatsapp, email, address, slogan, footerText, instagramUrl, facebookUrl, upiId, upiPayeeName } = req.body;
+        const {
+            siteName, contactNumber, whatsapp, email, address, slogan, footerText,
+            instagramUrl, facebookUrl, threadsUrl, twitterUrl, youtubeUrl, googleMapsUrl,
+            upiId, upiPayeeName
+        } = req.body;
         let settings = await Settings.findOne();
         if (!settings) settings = new Settings();
 
@@ -31,6 +35,10 @@ const updateSettings = async (req, res) => {
         if (footerText !== undefined) settings.footerText = footerText;
         if (instagramUrl !== undefined) settings.instagramUrl = instagramUrl;
         if (facebookUrl !== undefined) settings.facebookUrl = facebookUrl;
+        if (threadsUrl !== undefined) settings.threadsUrl = threadsUrl;
+        if (twitterUrl !== undefined) settings.twitterUrl = twitterUrl;
+        if (youtubeUrl !== undefined) settings.youtubeUrl = youtubeUrl;
+        if (googleMapsUrl !== undefined) settings.googleMapsUrl = googleMapsUrl;
         if (upiId !== undefined) settings.upiId = upiId;
         if (upiPayeeName !== undefined) settings.upiPayeeName = upiPayeeName;
 

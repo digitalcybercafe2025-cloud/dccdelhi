@@ -48,6 +48,34 @@
   --brand-gradient: var(--grad-orange);
 }
 
+.dark[data-theme='blue'],
+.dark [data-theme='blue'],
+html.dark[data-theme='blue'],
+:root.dark[data-theme='blue'] {
+  --brand-primary: #3b82f6;
+}
+
+.dark[data-theme='green'],
+.dark [data-theme='green'],
+html.dark[data-theme='green'],
+:root.dark[data-theme='green'] {
+  --brand-primary: #10b981;
+}
+
+.dark[data-theme='red'],
+.dark [data-theme='red'],
+html.dark[data-theme='red'],
+:root.dark[data-theme='red'] {
+  --brand-primary: #f43f5e;
+}
+
+.dark[data-theme='orange'],
+.dark [data-theme='orange'],
+html.dark[data-theme='orange'],
+:root.dark[data-theme='orange'] {
+  --brand-primary: #fb923c;
+}
+
 :root,
 .light,
 .light-theme,

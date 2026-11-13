@@ -2,33 +2,36 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ServiceCard } from '../../components/ServiceCard';
 import { Service } from '../../types';
+import { SERVICES } from '../../constants';
 import api from '../api/axios';
 import { Loader2 } from 'lucide-react';
 
+let cachedAllServices: Service[] | null = null;
+
 export const AllServices: React.FC = () => {
     const navigate = useNavigate();
-    const [services, setServices] = useState<Service[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [services, setServices] = useState<Service[]>(() => cachedAllServices || SERVICES);
+    const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
     useEffect(() => {
+        let isMounted = true;
         const fetchServices = async () => {
             try {
                 const response = await api.get('/services');
-                if (response.data.success) {
-                    setServices(response.data.data);
-                } else {
-                    setError('Failed to load services.');
+                if (response.data?.success && Array.isArray(response.data.data) && response.data.data.length > 0) {
+                    cachedAllServices = response.data.data;
+                    if (isMounted) setServices(response.data.data);
                 }
             } catch (err) {
-                console.error("Failed to fetch services", err);
-                setError('Failed to load services. Please try again later.');
+                console.warn("Failed to fetch dynamic services, using fallback", err);
             } finally {
-                setLoading(false);
+                if (isMounted) setLoading(false);
             }
         };
 
         fetchServices();
+        return () => { isMounted = false; };
     }, []);
 
     if (loading) {
@@ -39,7 +42,7 @@ export const AllServices: React.FC = () => {
         );
     }
 
-    if (error) {
+    if (error && services.length === 0) {
         return (
             <div className="min-h-screen flex items-center justify-center transition-colors duration-500" style={{ backgroundColor: 'var(--app-bg)' }}>
                 <div className="text-center">
