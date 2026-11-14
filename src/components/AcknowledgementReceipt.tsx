@@ -129,12 +129,50 @@ export const AcknowledgementReceipt = forwardRef<HTMLDivElement, Acknowledgement
                         </div>
 
                         <div className="grid grid-cols-12 px-4 py-2.5 items-center bg-slate-50/40 hover:bg-slate-50">
+                            <div className="col-span-5 sm:col-span-4 font-bold text-slate-600">Payment Method:</div>
+                            <div className="col-span-7 sm:col-span-8 font-bold text-slate-900">
+                                {String((paymentDetails as any)?.method || '').toLowerCase() === 'cash' || String(paymentDetails?.paymentStatus || '').toUpperCase() === 'PAYMENT_PENDING'
+                                    ? 'Cash at Counter'
+                                    : 'UPI Payment'}
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-12 px-4 py-2.5 items-center hover:bg-slate-50/50">
                             <div className="col-span-5 sm:col-span-4 font-bold text-slate-600">Payment Status:</div>
                             <div className="col-span-7 sm:col-span-8">
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
-                                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                                    {paymentDetails?.paymentStatus === 'Paid' ? 'Paid Successfully' : paymentDetails?.paymentStatus || 'Paid'}
-                                </span>
+                                {(() => {
+                                    const statusUpper = String(paymentDetails?.paymentStatus || '').toUpperCase();
+                                    if (statusUpper === 'PAID') {
+                                        return (
+                                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                                Paid Successfully
+                                            </span>
+                                        );
+                                    }
+                                    if (statusUpper === 'PAYMENT_PENDING' || String((paymentDetails as any)?.method || '').toLowerCase() === 'cash') {
+                                        return (
+                                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-amber-100 text-amber-900 border border-amber-300">
+                                                <span className="w-2 h-2 rounded-full bg-amber-500" />
+                                                Payment Due at Counter
+                                            </span>
+                                        );
+                                    }
+                                    if (statusUpper === 'REJECTED' || statusUpper === 'FAILED') {
+                                        return (
+                                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-red-100 text-red-800 border border-red-300">
+                                                <span className="w-2 h-2 rounded-full bg-red-500" />
+                                                Payment Evidence Rejected
+                                            </span>
+                                        );
+                                    }
+                                    return (
+                                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-blue-100 text-blue-900 border border-blue-300">
+                                            <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                                            Pending Verification
+                                        </span>
+                                    );
+                                })()}
                             </div>
                         </div>
 

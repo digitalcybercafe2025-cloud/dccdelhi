@@ -114,7 +114,7 @@ export const ApplyService: React.FC = () => {
         }
     };
 
-    const handlePaymentComplete = async (paymentDetails: { transactionId: string; method: string }) => {
+    const handlePaymentComplete = async (paymentDetails: { transactionId: string; method: string; screenshotFile?: File | null }) => {
         if (!service || !collectedUserDetails) return;
         setIsProcessing(true);
         try {
@@ -130,13 +130,21 @@ export const ApplyService: React.FC = () => {
                 state: collectedUserDetails.state,
                 pincode: collectedUserDetails.pincode
             }));
+
+            const initialPaymentStatus = paymentDetails.method === 'cash' ? 'PAYMENT_PENDING' : 'PENDING_VERIFICATION';
+
             formDataToSend.append('paymentDetails', JSON.stringify({
                 amount: service.fee,
                 transactionId: paymentDetails.transactionId,
                 method: paymentDetails.method,
-                paymentStatus: 'Paid',
+                paymentStatus: initialPaymentStatus,
                 paymentDate: new Date().toISOString()
             }));
+
+            // Append optional payment screenshot
+            if (paymentDetails.screenshotFile) {
+                formDataToSend.append('paymentScreenshot', paymentDetails.screenshotFile, paymentDetails.screenshotFile.name);
+            }
 
             // Append service-specific fields as JSON
             if (Object.keys(collectedSpecificFields).length > 0) {
@@ -252,13 +260,31 @@ export const ApplyService: React.FC = () => {
                         <div className="absolute bottom-0 left-0 w-32 h-32 bg-black/10 rounded-full blur-2xl pointer-events-none" />
                         <h1 className="text-2xl md:text-3xl font-black tracking-tight relative z-10">{service.title}</h1>
                         <p className="opacity-90 font-bold text-sm mt-1 relative z-10">{service.description}</p>
-                        <div className="mt-4 flex items-center gap-3 relative z-10">
+                        <div className="mt-4 flex flex-wrap items-center gap-2.5 relative z-10">
                             <span className="inline-flex items-center bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold">
                                 Fee: ₹{service.fee}
                             </span>
                             <span className="inline-flex items-center bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold">
                                 ⏱ {service.estimatedDays}
                             </span>
+                            {/* Visit Classification Badge (Module 4) */}
+                            {service.visitType === 'physical_visit' ? (
+                                <span className="inline-flex items-center gap-1 bg-amber-400 text-slate-900 px-3 py-1 rounded-full text-xs font-black shadow-xs">
+                                    🏢 Physical Visit Required at Cafe
+                                </span>
+                            ) : service.visitType === 'official_appointment' ? (
+                                <span className="inline-flex items-center gap-1 bg-indigo-300 text-indigo-950 px-3 py-1 rounded-full text-xs font-black shadow-xs">
+                                    🏛️ Govt Appointment Required
+                                </span>
+                            ) : service.visitType === 'conditional_visit' ? (
+                                <span className="inline-flex items-center gap-1 bg-sky-300 text-sky-950 px-3 py-1 rounded-full text-xs font-black shadow-xs">
+                                    ℹ️ Conditional Visit: {service.visitNote || 'Case Specific'}
+                                </span>
+                            ) : (
+                                <span className="inline-flex items-center gap-1 bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold text-white">
+                                    🌐 100% Online / Remote
+                                </span>
+                            )}
                         </div>
                     </div>
 

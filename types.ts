@@ -49,6 +49,9 @@ export interface Service {
   color: 'green' | 'blue' | 'red' | 'orange';
   estimatedDays: string;
   active?: boolean;
+  visitType?: 'online' | 'physical_visit' | 'conditional_visit' | 'official_appointment';
+  visitNote?: string;
+  isDraft?: boolean;
 }
 
 export interface ApplicationDocument {

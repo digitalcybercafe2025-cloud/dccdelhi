@@ -51,23 +51,65 @@ const createApplication = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Invalid or incomplete user details.' });
         }
 
-        const parsedPaymentDetails = safeJsonParse(paymentDetails);
-        if (!parsedPaymentDetails || !parsedPaymentDetails.transactionId) {
-            return res.status(400).json({ success: false, message: 'Payment details are required. Complete payment before submitting.' });
-        }
+        const parsedPaymentDetails = safeJsonParse(paymentDetails) || {};
+        const paymentMethod = (parsedPaymentDetails.method || 'upi').toLowerCase();
 
-        // Duplicate UTR check (prevent fraud / duplicate usage of same payment reference)
-        if (parsedPaymentDetails.transactionId && parsedPaymentDetails.method === 'upi') {
-            const cleanUtr = parsedPaymentDetails.transactionId.trim();
-            const existingWithSameUtr = await Application.findOne({
-                'paymentDetails.transactionId': cleanUtr
-            });
-            if (existingWithSameUtr) {
+        // Detect optional payment screenshot in multipart files
+        const allUploadedFiles = req.files || [];
+        const screenshotFile = allUploadedFiles.find(f => f.fieldname === 'paymentScreenshot');
+        const documentFiles = allUploadedFiles.filter(f => f.fieldname !== 'paymentScreenshot');
+
+        let finalTransactionId = (parsedPaymentDetails.transactionId || '').trim();
+        let paymentStatus = 'PENDING_VERIFICATION';
+        let evidenceType = 'none';
+        let screenshotUrl = '';
+
+        if (paymentMethod === 'cash') {
+            finalTransactionId = `CASH-${Date.now()}`;
+            paymentStatus = 'PAYMENT_PENDING';
+            evidenceType = 'cash';
+        } else {
+            // UPI Payment verification rules (Module 8)
+            const hasUtr = Boolean(finalTransactionId);
+            const hasScreenshot = Boolean(screenshotFile);
+
+            if (!hasUtr && !hasScreenshot) {
                 return res.status(400).json({
                     success: false,
-                    message: `This UPI UTR number (${cleanUtr}) has already been submitted for Application #${existingWithSameUtr.trackingId}. Please verify your transaction reference.`
+                    message: 'Payment evidence required: please enter your 12-digit UPI UTR number or upload a Payment Screenshot.'
                 });
             }
+
+            if (hasUtr) {
+                if (!/^[0-9]{12}$/.test(finalTransactionId)) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Invalid UTR: UPI Reference Number must be exactly 12 numeric digits (e.g. 412389123456).'
+                    });
+                }
+                const existingWithSameUtr = await Application.findOne({
+                    'paymentDetails.transactionId': finalTransactionId
+                });
+                if (existingWithSameUtr) {
+                    return res.status(400).json({
+                        success: false,
+                        message: `This UPI UTR number (${finalTransactionId}) has already been submitted for Application #${existingWithSameUtr.trackingId}. Duplicate payment references are flagged.`
+                    });
+                }
+            } else {
+                finalTransactionId = `UPI-SS-${Date.now()}`;
+            }
+
+            if (screenshotFile) {
+                screenshotUrl = `uploads/${screenshotFile.filename}`;
+            }
+
+            if (hasUtr && hasScreenshot) evidenceType = 'both';
+            else if (hasUtr) evidenceType = 'utr_only';
+            else evidenceType = 'screenshot_only';
+
+            // Under Module 8: MUST NEVER be automatically marked as Paid without Admin approval!
+            paymentStatus = 'PENDING_VERIFICATION';
         }
 
         const parsedSpecificFields = safeJsonParse(serviceSpecificFields) || {};
@@ -78,11 +120,11 @@ const createApplication = async (req, res) => {
         const random = Math.floor(100000 + Math.random() * 900000);
         const trackingId = `${serviceCode}-${year}-${random}`;
 
-        // Map uploaded files to document records
+        // Map uploaded service documents (excluding payment screenshot)
         let documents = [];
         const parsedDocTypes = safeJsonParse(req.body.documentTypes) || [];
-        if (req.files && req.files.length > 0) {
-            documents = req.files.map((file, idx) => ({
+        if (documentFiles.length > 0) {
+            documents = documentFiles.map((file, idx) => ({
                 docType: parsedDocTypes[idx] || file.fieldname,
                 fileName: file.filename,
                 filePath: `uploads/${file.filename}`,
@@ -101,11 +143,19 @@ const createApplication = async (req, res) => {
             documents,
             paymentDetails: {
                 amount: parsedPaymentDetails.amount || 0,
-                transactionId: parsedPaymentDetails.transactionId,
-                paymentId: parsedPaymentDetails.paymentId || parsedPaymentDetails.transactionId,
-                method: parsedPaymentDetails.method || 'upi',
-                paymentStatus: parsedPaymentDetails.paymentStatus || 'Paid',
-                paymentDate: parsedPaymentDetails.paymentDate || new Date()
+                transactionId: finalTransactionId,
+                paymentId: finalTransactionId,
+                method: paymentMethod,
+                paymentStatus: paymentStatus,
+                paymentDate: new Date(),
+                screenshotUrl: screenshotUrl || undefined,
+                evidenceType: evidenceType,
+                auditLog: [{
+                    action: 'APPLICATION_CREATED',
+                    performedBy: parsedUserDetails.fullName || 'Customer',
+                    timestamp: new Date(),
+                    note: `Submitted via ${paymentMethod === 'cash' ? 'Cash at Counter' : 'UPI Payment'} (${evidenceType})`
+                }]
             },
             status: 'received'
         });

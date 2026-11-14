@@ -46,6 +46,28 @@ const serviceSchema = new mongoose.Schema({
         required: true,
         enum: ['Government', 'Digital', 'Academic']
     },
+    visitType: {
+        type: String,
+        enum: ['online', 'physical_visit', 'conditional_visit', 'official_appointment'],
+        default: 'online'
+    },
+    visitNote: {
+        type: String,
+        default: ''
+    },
+    serviceSpecificFields: [{
+        name: { type: String, required: true },
+        label: { type: String, required: true },
+        type: { type: String, default: 'text' },
+        required: { type: Boolean, default: false },
+        options: [{ type: String }],
+        placeholder: { type: String, default: '' },
+        helpText: { type: String, default: '' }
+    }],
+    isDraft: {
+        type: Boolean,
+        default: false
+    },
     externalLink: {
         type: String,
         required: false

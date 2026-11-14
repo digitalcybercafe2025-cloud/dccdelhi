@@ -4,12 +4,33 @@ const Application = require('../models/Application');
 // @route GET /api/payments
 const getPayments = async (req, res) => {
     try {
-        const { startDate, endDate, status, search, page = 1, limit = 20 } = req.query;
+        const { startDate, endDate, status, method, search, page = 1, limit = 20 } = req.query;
 
         let query = {};
 
         if (status && status !== 'all') {
-            query['paymentDetails.paymentStatus'] = status;
+            const s = status.toLowerCase();
+            if (s === 'pending_verification' || s === 'pending') {
+                query['paymentDetails.paymentStatus'] = { $in: ['PENDING_VERIFICATION', 'Pending', 'pending', 'PAYMENT_PENDING'] };
+            } else if (s === 'verified' || s === 'paid') {
+                query['paymentDetails.paymentStatus'] = { $in: ['PAID', 'Paid'] };
+            } else if (s === 'rejected' || s === 'failed') {
+                query['paymentDetails.paymentStatus'] = { $in: ['REJECTED', 'Failed', 'failed'] };
+            } else if (s === 'cash' || s === 'cash_at_counter') {
+                query['paymentDetails.method'] = 'cash';
+            } else if (s === 'utr_only') {
+                query['paymentDetails.evidenceType'] = 'utr_only';
+            } else if (s === 'screenshot_only') {
+                query['paymentDetails.evidenceType'] = 'screenshot_only';
+            } else if (s === 'both') {
+                query['paymentDetails.evidenceType'] = 'both';
+            } else {
+                query['paymentDetails.paymentStatus'] = status;
+            }
+        }
+
+        if (method && method !== 'all') {
+            query['paymentDetails.method'] = method;
         }
 
         if (startDate || endDate) {
@@ -33,11 +54,24 @@ const getPayments = async (req, res) => {
             .sort({ 'paymentDetails.paymentDate': -1, createdAt: -1 })
             .skip(skip)
             .limit(parseInt(limit))
-            .select('trackingId serviceName userDetails paymentDetails adminRemarks createdAt');
+            .select('trackingId serviceName userDetails paymentDetails adminRemarks createdAt status');
 
         const payments = applications.map(app => {
-            const status = app.paymentDetails?.paymentStatus || 'Pending';
+            const rawStatus = app.paymentDetails?.paymentStatus || 'Pending';
             const date = app.paymentDetails?.paymentDate || app.createdAt;
+            const pMethod = (app.paymentDetails?.method || 'upi').toLowerCase();
+            const hasUtr = Boolean(app.paymentDetails?.transactionId && !app.paymentDetails?.transactionId.startsWith('CASH-') && !app.paymentDetails?.transactionId.startsWith('UPI-SS-'));
+            const hasScreenshot = Boolean(app.paymentDetails?.screenshotUrl);
+
+            let evidenceType = app.paymentDetails?.evidenceType;
+            if (!evidenceType || evidenceType === 'none') {
+                if (pMethod === 'cash') evidenceType = 'cash';
+                else if (hasUtr && hasScreenshot) evidenceType = 'both';
+                else if (hasScreenshot) evidenceType = 'screenshot_only';
+                else if (hasUtr) evidenceType = 'utr_only';
+                else evidenceType = 'none';
+            }
+
             return {
                 _id: app._id,
                 applicationId: app.trackingId || app._id,
@@ -48,11 +82,18 @@ const getPayments = async (req, res) => {
                 userEmail: app.userDetails?.email || '',
                 userAddress: [app.userDetails?.city, app.userDetails?.state].filter(Boolean).join(', ') || 'N/A',
                 amount: app.paymentDetails?.amount || 0,
-                method: app.paymentDetails?.method || 'upi',
+                method: pMethod,
                 transactionId: app.paymentDetails?.transactionId || 'N/A',
-                status: status,
-                paymentStatus: status,
+                screenshotUrl: app.paymentDetails?.screenshotUrl || '',
+                evidenceType: evidenceType,
+                status: rawStatus,
+                paymentStatus: rawStatus,
+                appStatus: app.status || 'received',
+                verifiedBy: app.paymentDetails?.verifiedBy || '',
+                verifiedAt: app.paymentDetails?.verifiedAt || null,
+                rejectionReason: app.paymentDetails?.rejectionReason || '',
                 adminRemarks: app.adminRemarks || app.paymentDetails?.adminRemark || '',
+                auditLog: app.paymentDetails?.auditLog || [],
                 createdAt: date,
                 paymentDate: date
             };
@@ -154,12 +195,11 @@ const getStats = async (req, res) => {
     }
 };
 
-// @desc  Update payment status (Verify / Reject with remarks)
+// @desc  Update payment status (Verify / Reject with remarks / Mark cash received)
 // @route PATCH /api/payments/:id/status
 const updatePaymentStatus = async (req, res) => {
     try {
-        const { status, adminRemarks } = req.body;
-        const normalizedStatus = ['Paid', 'Pending', 'Failed'].includes(status) ? status : (status === 'Paid' ? 'Paid' : 'Pending');
+        const { action, status, adminRemarks, rejectionReason } = req.body;
 
         let app = await Application.findById(req.params.id);
         if (!app) {
@@ -170,23 +210,70 @@ const updatePaymentStatus = async (req, res) => {
             app.paymentDetails = {};
         }
 
-        app.paymentDetails.paymentStatus = normalizedStatus;
+        const adminUser = req.admin?.username || req.admin?.email || 'Admin';
+        let newStatus = status;
+
+        if (action === 'approve' || status === 'Paid' || status === 'PAID') {
+            newStatus = 'PAID';
+            app.paymentDetails.paymentStatus = 'PAID';
+            app.paymentDetails.verifiedBy = adminUser;
+            app.paymentDetails.verifiedAt = new Date();
+            app.paymentDetails.rejectionReason = undefined;
+            if (app.status === 'received') {
+                app.status = 'review';
+            }
+        } else if (action === 'reject' || status === 'REJECTED' || status === 'Failed') {
+            newStatus = 'REJECTED';
+            app.paymentDetails.paymentStatus = 'REJECTED';
+            app.paymentDetails.rejectionReason = rejectionReason || adminRemarks || 'Invalid payment reference or screenshot.';
+            app.paymentDetails.verifiedBy = adminUser;
+            app.paymentDetails.verifiedAt = new Date();
+        } else if (action === 'mark_cash_received') {
+            newStatus = 'PAID';
+            app.paymentDetails.paymentStatus = 'PAID';
+            app.paymentDetails.method = 'cash';
+            app.paymentDetails.verifiedBy = adminUser;
+            app.paymentDetails.verifiedAt = new Date();
+            if (app.status === 'received') {
+                app.status = 'review';
+            }
+        } else if (action === 'request_evidence') {
+            newStatus = 'PENDING_VERIFICATION';
+            app.paymentDetails.paymentStatus = 'PENDING_VERIFICATION';
+            app.paymentDetails.adminRemark = adminRemarks || 'Please submit updated payment reference / screenshot.';
+        } else if (status) {
+            app.paymentDetails.paymentStatus = status;
+        }
+
         if (adminRemarks !== undefined) {
             app.paymentDetails.adminRemark = adminRemarks;
             app.adminRemarks = adminRemarks;
         }
-        if (normalizedStatus === 'Paid' && !app.paymentDetails.paymentDate) {
-            app.paymentDetails.paymentDate = new Date();
+
+        // Add to auditLog
+        if (!app.paymentDetails.auditLog) {
+            app.paymentDetails.auditLog = [];
         }
+        app.paymentDetails.auditLog.push({
+            action: action ? action.toUpperCase() : `STATUS_SET_${newStatus}`,
+            performedBy: adminUser,
+            timestamp: new Date(),
+            note: adminRemarks || rejectionReason || `Status updated to ${newStatus}`
+        });
+
         await app.save();
 
         res.json({
             success: true,
-            message: `Payment status updated to ${normalizedStatus}`,
+            message: `Payment status successfully updated to ${newStatus}`,
             data: {
                 _id: app._id,
+                trackingId: app.trackingId,
                 status: app.paymentDetails.paymentStatus,
                 paymentStatus: app.paymentDetails.paymentStatus,
+                verifiedBy: app.paymentDetails.verifiedBy,
+                verifiedAt: app.paymentDetails.verifiedAt,
+                rejectionReason: app.paymentDetails.rejectionReason,
                 adminRemarks: app.adminRemarks
             }
         });

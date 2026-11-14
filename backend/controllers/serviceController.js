@@ -34,7 +34,7 @@ const serviceUpload = multer({
 // @access  Public
 const getServices = async (req, res) => {
     try {
-        const services = await Service.find({ active: true }).sort({ priority: -1 });
+        const services = await Service.find({ active: true, isDraft: { $ne: true } }).sort({ priority: -1 });
         res.status(200).json({ success: true, count: services.length, data: services });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Server Error', error: error.message });
@@ -144,6 +144,42 @@ const normalizeServicePayload = (rawBody, file) => {
             ...configDocNames,
         ];
         if (combined.length > 0) data.requiredDocs = Array.from(new Set(combined));
+    }
+
+    // Physical visit classification (Module 4)
+    if (data.visitType && ['online', 'physical_visit', 'conditional_visit', 'official_appointment'].includes(data.visitType)) {
+        data.visitType = data.visitType;
+    } else if (data.visitType) {
+        data.visitType = 'online';
+    }
+    if (data.visitNote !== undefined) {
+        data.visitNote = String(data.visitNote || '').trim();
+    }
+
+    // Dynamic service-specific fields (Module 6)
+    if (data.serviceSpecificFields !== undefined) {
+        let fields = data.serviceSpecificFields;
+        if (typeof fields === 'string') {
+            try { fields = JSON.parse(fields); } catch { fields = []; }
+        }
+        if (Array.isArray(fields)) {
+            data.serviceSpecificFields = fields
+                .filter(f => f && f.name && f.label)
+                .map(f => ({
+                    name: String(f.name).trim(),
+                    label: String(f.label).trim(),
+                    type: ['text', 'date', 'select', 'number', 'tel'].includes(f.type) ? f.type : 'text',
+                    required: Boolean(f.required),
+                    options: Array.isArray(f.options) ? f.options.map(o => String(o).trim()).filter(Boolean) : [],
+                    placeholder: String(f.placeholder || '').trim(),
+                    helpText: String(f.helpText || '').trim()
+                }));
+        }
+    }
+
+    // Draft status flag (Module 7)
+    if (data.isDraft !== undefined) {
+        data.isDraft = data.isDraft === true || data.isDraft === 'true';
     }
 
     return data;

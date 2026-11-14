@@ -28,7 +28,10 @@ const EMPTY = {
     idProofs: '',
     addressProofs: '',
     otherDocs: '',
-    externalLink: ''
+    externalLink: '',
+    visitType: 'online',
+    visitNote: '',
+    isDraft: false
 };
 
 const ServicesManager: React.FC = () => {
@@ -140,7 +143,10 @@ const ServicesManager: React.FC = () => {
             idProofs: Array.isArray(svc.idProofs) ? svc.idProofs.join(', ') : (svc.idProofs || ''),
             addressProofs: Array.isArray(svc.addressProofs) ? svc.addressProofs.join(', ') : (svc.addressProofs || ''),
             otherDocs: Array.isArray(svc.otherDocs) ? svc.otherDocs.join(', ') : (svc.otherDocs || ''),
-            externalLink: svc.externalLink || ''
+            externalLink: svc.externalLink || '',
+            visitType: svc.visitType || 'online',
+            visitNote: svc.visitNote || '',
+            isDraft: Boolean(svc.isDraft)
         });
 
         const initialConfigs = Array.isArray(svc.documentConfigs) && svc.documentConfigs.length > 0
@@ -522,6 +528,52 @@ const ServicesManager: React.FC = () => {
                                 <label className={labelCls}>External Application Link (Optional)</label>
                                 <input value={form.externalLink} onChange={e => setForm(f => ({ ...f, externalLink: e.target.value }))}
                                     placeholder="https://..." className={modalInputCls} />
+                            </div>
+
+                            {/* ── Physical Visit Requirement (Module 4) ── */}
+                            <div>
+                                <label className={labelCls}>Physical Visit Classification</label>
+                                <select
+                                    value={form.visitType}
+                                    onChange={e => setForm(f => ({ ...f, visitType: e.target.value as any }))}
+                                    className={modalSelectCls}
+                                >
+                                    <option value="online">ONLINE / REMOTE (No visit needed)</option>
+                                    <option value="physical_visit">PHYSICAL VISIT REQUIRED (At Cafe)</option>
+                                    <option value="conditional_visit">CONDITIONAL VISIT (Case dependent)</option>
+                                    <option value="official_appointment">OFFICIAL APPOINTMENT (External Govt Office)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className={labelCls}>Visit Note / Instruction (Optional)</label>
+                                <input
+                                    type="text"
+                                    value={form.visitNote}
+                                    onChange={e => setForm(f => ({ ...f, visitNote: e.target.value }))}
+                                    placeholder="e.g. Biometrics requires visiting cafe"
+                                    className={modalInputCls}
+                                />
+                            </div>
+
+                            {/* ── Draft Mode Toggle (Module 7) ── */}
+                            <div className="col-span-2 flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
+                                <div>
+                                    <span className="text-xs font-black text-slate-800 uppercase tracking-wider block">
+                                        Draft Template Mode
+                                    </span>
+                                    <p className="text-[10px] text-slate-500 font-medium">
+                                        Draft services remain hidden from public customers until published.
+                                    </p>
+                                </div>
+                                <label className="relative inline-flex items-center cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={form.isDraft}
+                                        onChange={e => setForm(f => ({ ...f, isDraft: e.target.checked }))}
+                                        className="sr-only peer"
+                                    />
+                                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                </label>
                             </div>
                             {/* ── Dynamic Sub-Service Document Builder ── */}
                             <div className="col-span-2 bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-4">

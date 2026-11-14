@@ -324,6 +324,50 @@ export const TrackApplication: React.FC = () => {
                                 </div>
                             )}
 
+                            {/* ─── Payment Status Card (Module 11) ─── */}
+                            {application.paymentDetails && (
+                                <div className={`p-4 rounded-2xl border text-xs ${
+                                    String(application.paymentDetails.paymentStatus).toUpperCase() === 'PAID'
+                                        ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/30 text-emerald-800 dark:text-emerald-200'
+                                        : String(application.paymentDetails.paymentStatus).toUpperCase() === 'REJECTED'
+                                            ? 'bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/30 text-red-800 dark:text-red-200'
+                                            : String(application.paymentDetails.paymentStatus).toUpperCase() === 'PAYMENT_PENDING' || application.paymentDetails.method === 'cash'
+                                                ? 'bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/30 text-amber-900 dark:text-amber-200'
+                                                : 'bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/30 text-blue-900 dark:text-blue-200'
+                                }`}>
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-black uppercase tracking-wider">Payment Details:</span>
+                                            <span className="font-bold">
+                                                ₹{application.paymentDetails.amount} • {application.paymentDetails.method === 'cash' ? 'Cash at Counter' : 'UPI Payment'}
+                                            </span>
+                                        </div>
+                                        <span className={`px-2.5 py-0.5 rounded-full font-black text-[10px] uppercase tracking-wider ${
+                                            String(application.paymentDetails.paymentStatus).toUpperCase() === 'PAID'
+                                                ? 'bg-emerald-200 text-emerald-900'
+                                                : String(application.paymentDetails.paymentStatus).toUpperCase() === 'REJECTED'
+                                                    ? 'bg-red-200 text-red-900'
+                                                    : String(application.paymentDetails.paymentStatus).toUpperCase() === 'PAYMENT_PENDING' || application.paymentDetails.method === 'cash'
+                                                        ? 'bg-amber-200 text-amber-900'
+                                                        : 'bg-blue-200 text-blue-900'
+                                        }`}>
+                                            {String(application.paymentDetails.paymentStatus).toUpperCase() === 'PAID'
+                                                ? 'Verified & Paid'
+                                                : String(application.paymentDetails.paymentStatus).toUpperCase() === 'REJECTED'
+                                                    ? 'Payment Rejected'
+                                                    : String(application.paymentDetails.paymentStatus).toUpperCase() === 'PAYMENT_PENDING' || application.paymentDetails.method === 'cash'
+                                                        ? 'Payment Due at Counter'
+                                                        : 'Pending Verification'}
+                                        </span>
+                                    </div>
+                                    {String(application.paymentDetails.paymentStatus).toUpperCase() === 'REJECTED' && application.paymentDetails.rejectionReason && (
+                                        <p className="mt-2 text-[11px] font-semibold text-red-700 dark:text-red-300">
+                                            Reason: {application.paymentDetails.rejectionReason}
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+
                             {/* ─── Receipt Downloads (PDF + JPEG) ─── */}
                             <div className="flex flex-col gap-3">
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

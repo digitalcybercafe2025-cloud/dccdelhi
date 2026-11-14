@@ -41,9 +41,27 @@ const applicationSchema = new mongoose.Schema({
     amount: { type: Number, required: true },
     transactionId: String,
     paymentId: String,       // Alias used by payment gateways
-    method: String,          // upi | card | cash
-    paymentStatus: { type: String, default: 'Paid', enum: ['Paid', 'Pending', 'Failed'] },
-    paymentDate: { type: Date, default: Date.now }
+    method: { type: String, default: 'upi' }, // upi | cash | card
+    paymentStatus: {
+      type: String,
+      default: 'PENDING_VERIFICATION'
+    },
+    paymentDate: { type: Date, default: Date.now },
+    screenshotUrl: String,
+    evidenceType: {
+      type: String,
+      default: 'none'
+    }, // utr_only | screenshot_only | both | cash | none
+    verifiedBy: String,
+    verifiedAt: Date,
+    rejectionReason: String,
+    adminRemark: String,
+    auditLog: [{
+      action: String,
+      performedBy: String,
+      timestamp: { type: Date, default: Date.now },
+      note: String
+    }]
   },
   status: {
     type: String,

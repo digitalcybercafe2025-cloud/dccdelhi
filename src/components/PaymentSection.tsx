@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Loader2, CheckCircle, Smartphone, CreditCard, Banknote, Shield, Lock, Copy, QrCode, Download, AlertCircle } from 'lucide-react';
+import { Loader2, CheckCircle, Smartphone, Banknote, Shield, Lock, Copy, QrCode, Download, AlertCircle, Upload, X, FileText, Image as ImageIcon } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import api from '../api/axios';
 
 interface PaymentSectionProps {
     serviceName: string;
     amount: number;
-    onPaymentComplete: (details: { transactionId: string, method: string }) => void;
+    onPaymentComplete: (details: { transactionId: string; method: string; screenshotFile?: File | null }) => void;
     isProcessing: boolean;
 }
 
-type PaymentMethod = 'upi' | 'card' | 'cash';
+type PaymentMethod = 'upi' | 'cash';
 
 export const PaymentSection: React.FC<PaymentSectionProps> = ({ serviceName, amount, onPaymentComplete, isProcessing }) => {
     const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('upi');
@@ -19,6 +19,7 @@ export const PaymentSection: React.FC<PaymentSectionProps> = ({ serviceName, amo
     const [upiId, setUpiId] = useState('8445221632@upi');
     const [upiPayeeName, setUpiPayeeName] = useState('Digital Cyber Cafe');
     const [utrNumber, setUtrNumber] = useState('');
+    const [screenshotFile, setScreenshotFile] = useState<File | null>(null);
     const [copied, setCopied] = useState(false);
     const [downloadingQr, setDownloadingQr] = useState(false);
     const [qrDownloaded, setQrDownloaded] = useState(false);
@@ -112,43 +113,60 @@ export const PaymentSection: React.FC<PaymentSectionProps> = ({ serviceName, amo
         }
     };
 
-    const isUtrValid = paymentMethod === 'upi' ? /^[0-9]{12}$/.test(utrNumber.trim()) : true;
+    const cleanUtr = utrNumber.trim();
+    const hasUtr = cleanUtr.length > 0;
+    const hasScreenshot = Boolean(screenshotFile);
+    const isUtrFormatValid = !hasUtr || /^[0-9]{12}$/.test(cleanUtr);
+    const isPaymentValid = paymentMethod === 'cash' || ((hasUtr || hasScreenshot) && isUtrFormatValid);
+
+    const handleScreenshotChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (file.size > 5 * 1024 * 1024) {
+            setValidationError('Payment screenshot file is too large. Max 5MB allowed.');
+            return;
+        }
+        setScreenshotFile(file);
+        setValidationError(null);
+    };
 
     const handlePay = async (e?: React.MouseEvent) => {
         if (e) e.preventDefault();
         setValidationError(null);
 
-        // Strict 12-digit UTR validation for UPI
         if (paymentMethod === 'upi') {
-            const cleanUtr = utrNumber.trim();
-            if (!cleanUtr) {
-                setValidationError('Please enter your 12-digit UPI UTR number from PhonePe/GooglePay/Paytm.');
+            if (!hasUtr && !hasScreenshot) {
+                setValidationError('Please enter your 12-digit UPI UTR number OR upload a Payment Screenshot.');
                 return;
             }
-            if (!/^[0-9]{12}$/.test(cleanUtr)) {
-                setValidationError('UTR number must be exactly 12 digits (numbers only, e.g. 412389123456).');
+            if (hasUtr && !/^[0-9]{12}$/.test(cleanUtr)) {
+                setValidationError('UTR number must be exactly 12 numeric digits (e.g. 412389123456).');
                 return;
             }
         }
 
         setPaying(true);
 
-        // Verification simulation animation
-        await new Promise(r => setTimeout(r, 1200));
+        // Simulated verification progress
+        await new Promise(r => setTimeout(r, 1000));
         setConfirmed(true);
-        await new Promise(r => setTimeout(r, 600));
+        await new Promise(r => setTimeout(r, 500));
 
-        const finalTxnId = utrNumber.trim()
-            ? utrNumber.trim()
-            : (paymentMethod === 'cash' ? 'CSH' : 'TXN') + Date.now();
+        const finalTxnId = cleanUtr
+            ? cleanUtr
+            : (paymentMethod === 'cash' ? `CASH-${Date.now()}` : `UPI-SS-${Date.now()}`);
 
-        onPaymentComplete({ transactionId: finalTxnId, method: paymentMethod });
+        onPaymentComplete({
+            transactionId: finalTxnId,
+            method: paymentMethod,
+            screenshotFile: screenshotFile || null
+        });
     };
 
+    // Strictly TWO payment options as per Module 8
     const METHODS: { key: PaymentMethod; icon: React.ReactNode; label: string; sub: string }[] = [
-        { key: 'upi', icon: <Smartphone className="w-5 h-5" />, label: 'UPI / Dynamic QR Code', sub: 'PhonePe, GPay, Paytm, BHIM' },
-        { key: 'card', icon: <CreditCard className="w-5 h-5" />, label: 'Card / Net Banking', sub: 'Debit, Credit, NEFT' },
-        { key: 'cash', icon: <Banknote className="w-5 h-5" />, label: 'Cash at Counter', sub: 'Pay in person at Cyber Cafe' },
+        { key: 'upi', icon: <Smartphone className="w-5 h-5" />, label: 'UPI / Dynamic QR Code', sub: 'PhonePe, GPay, Paytm, BHIM, Cred' },
+        { key: 'cash', icon: <Banknote className="w-5 h-5" />, label: 'Cash at Counter', sub: 'Pay in person at Cyber Cafe counter' },
     ];
 
     if (confirmed) {
@@ -157,7 +175,7 @@ export const PaymentSection: React.FC<PaymentSectionProps> = ({ serviceName, amo
                 <div className="w-20 h-20 rounded-full bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center mb-4">
                     <CheckCircle className="w-10 h-10 text-emerald-500" />
                 </div>
-                <h3 className="text-xl font-black text-slate-900 dark:text-white">Payment Recorded!</h3>
+                <h3 className="text-xl font-black text-slate-900 dark:text-white">Payment Evidence Recorded!</h3>
                 <p className="text-slate-400 text-sm font-bold mt-1">Generating your Acknowledgement Receipt...</p>
             </div>
         );
@@ -186,7 +204,7 @@ export const PaymentSection: React.FC<PaymentSectionProps> = ({ serviceName, amo
                 </div>
             </div>
 
-            {/* Payment Method Selection */}
+            {/* Payment Method Selection (Module 8: ONLY 2 Methods) */}
             <div>
                 <label className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest block mb-3">Choose Payment Method</label>
                 <div className="space-y-3">
@@ -243,7 +261,7 @@ export const PaymentSection: React.FC<PaymentSectionProps> = ({ serviceName, amo
                         </div>
                     </div>
 
-                    {/* Primary Action: Download QR Code for Gallery Scan */}
+                    {/* Action: Download QR Code for Gallery Scan */}
                     <div className="max-w-sm mx-auto mb-3">
                         <button
                             type="button"
@@ -287,39 +305,95 @@ export const PaymentSection: React.FC<PaymentSectionProps> = ({ serviceName, amo
                         <p>2. <strong>Ya Copy UPI ID:</strong> Upar se UPI ID copy karke PhonePe/GPay me seedha ₹{amount} transfer karein.</p>
                     </div>
 
-                    {/* Enter UTR Number Input - Strictly Mandatory */}
-                    <div className="max-w-md mx-auto text-left pt-3 border-t border-slate-200 dark:border-slate-700/60">
-                        <div className="flex items-center justify-between mb-1.5">
-                            <label className="text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
-                                UPI Reference / UTR Number <span className="text-red-500">* (Zaroori)</span>
-                            </label>
-                            {utrNumber.trim().length === 12 && (
-                                <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full flex items-center gap-1">
-                                    <CheckCircle size={10} /> 12-Digit Valid
-                                </span>
-                            )}
+                    {/* Evidence Requirement Box (Module 8: UTR or Screenshot or Both) */}
+                    <div className="max-w-md mx-auto text-left pt-3 border-t border-slate-200 dark:border-slate-700/60 space-y-4">
+                        <div className="p-3 bg-blue-50/80 dark:bg-blue-500/10 rounded-xl border border-blue-200/80 dark:border-blue-500/20 text-[11px] text-blue-900 dark:text-blue-200 font-medium">
+                            <span className="font-black text-blue-700 dark:text-blue-300 uppercase block mb-0.5">📌 Payment Evidence Required</span>
+                            Payment complete hone ke baad <strong>12-digit UTR</strong> enter karein ya <strong>Payment Screenshot</strong> upload karein (ya dono). Form turant submit ho jayega!
                         </div>
-                        <input
-                            type="text"
-                            maxLength={12}
-                            value={utrNumber}
-                            onChange={(e) => {
-                                const val = e.target.value.replace(/[^0-9]/g, '');
-                                setUtrNumber(val);
-                                if (val.length === 12) setValidationError(null);
-                            }}
-                            placeholder="Enter 12-digit UTR from PhonePe/GPay (e.g. 412356789012)"
-                            className={`w-full px-4 py-3 rounded-xl bg-white dark:bg-slate-800 border ${
-                                utrNumber.length > 0 && utrNumber.length < 12 ? 'border-amber-400 focus:border-amber-500' : 'border-slate-300 dark:border-slate-600 focus:border-blue-500'
-                            } text-slate-900 dark:text-white text-sm font-mono tracking-wider placeholder:tracking-normal placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500/10 transition-all`}
-                        />
-                        <div className="flex items-center justify-between mt-1 text-[10px]">
-                            <p className="text-slate-500 dark:text-slate-400 font-medium">
-                                Payment ke baad receipt se 12-digit UTR number enter karein.
-                            </p>
-                            <span className={`font-mono font-bold ${utrNumber.length === 12 ? 'text-emerald-600' : 'text-slate-400'}`}>
-                                {utrNumber.length}/12
-                            </span>
+
+                        {/* Option 1: UTR Number */}
+                        <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                                <label className="text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                                    Option 1: UPI UTR / Reference No. {hasScreenshot ? <span className="text-slate-400 font-normal">(Optional)</span> : <span className="text-blue-600">*</span>}
+                                </label>
+                                {cleanUtr.length === 12 && (
+                                    <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                        <CheckCircle size={10} /> 12-Digit Valid
+                                    </span>
+                                )}
+                            </div>
+                            <input
+                                type="text"
+                                maxLength={12}
+                                value={utrNumber}
+                                onChange={(e) => {
+                                    const val = e.target.value.replace(/[^0-9]/g, '');
+                                    setUtrNumber(val);
+                                    if (val.length === 12) setValidationError(null);
+                                }}
+                                placeholder="Enter 12-digit UTR from PhonePe/GPay (e.g. 412356789012)"
+                                className={`w-full px-4 py-3 rounded-xl bg-white dark:bg-slate-800 border ${
+                                    utrNumber.length > 0 && utrNumber.length < 12 ? 'border-amber-400 focus:border-amber-500' : 'border-slate-300 dark:border-slate-600 focus:border-blue-500'
+                                } text-slate-900 dark:text-white text-sm font-mono tracking-wider placeholder:tracking-normal placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500/10 transition-all`}
+                            />
+                            <div className="flex items-center justify-between mt-1 text-[10px]">
+                                <p className="text-slate-500 dark:text-slate-400 font-medium">
+                                    Payment receipt par 12-digit UPI Transaction / UTR ID likha hota hai.
+                                </p>
+                                <span className={`font-mono font-bold ${cleanUtr.length === 12 ? 'text-emerald-600' : 'text-slate-400'}`}>
+                                    {cleanUtr.length}/12
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Divider */}
+                        <div className="relative flex items-center justify-center my-1">
+                            <div className="border-t border-slate-200 dark:border-slate-700 w-full" />
+                            <span className="bg-slate-100 dark:bg-slate-800 px-3 text-[11px] font-black text-slate-500 uppercase tracking-widest absolute">OR</span>
+                        </div>
+
+                        {/* Option 2: Payment Screenshot Upload */}
+                        <div>
+                            <label className="text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider block mb-1.5">
+                                Option 2: Upload Payment Screenshot {cleanUtr.length === 12 ? <span className="text-slate-400 font-normal">(Optional)</span> : <span className="text-blue-600">*</span>}
+                            </label>
+                            {screenshotFile ? (
+                                <div className="p-3 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-300 dark:border-emerald-500/30 rounded-xl flex items-center justify-between gap-3">
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                        <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center text-emerald-600 shrink-0">
+                                            {screenshotFile.type.includes('pdf') ? <FileText size={18} /> : <ImageIcon size={18} />}
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="text-xs font-bold text-emerald-800 dark:text-emerald-200 truncate">{screenshotFile.name}</p>
+                                            <p className="text-[10px] text-emerald-600">{(screenshotFile.size / 1024).toFixed(1)} KB • Attached</p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setScreenshotFile(null)}
+                                        className="p-1 rounded-lg text-emerald-700 hover:text-red-600 hover:bg-red-50 transition-colors"
+                                        title="Remove screenshot"
+                                    >
+                                        <X size={16} />
+                                    </button>
+                                </div>
+                            ) : (
+                                <label className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-slate-300 dark:border-slate-600 hover:border-blue-400 dark:hover:border-blue-500 rounded-xl bg-white dark:bg-slate-800 cursor-pointer transition-colors group">
+                                    <Upload className="w-5 h-5 text-slate-400 group-hover:text-blue-600 mb-1 transition-colors" />
+                                    <span className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                                        Click to browse or drop payment screenshot
+                                    </span>
+                                    <span className="text-[10px] text-slate-400 mt-0.5">JPG, PNG, PDF • Max 5MB</span>
+                                    <input
+                                        type="file"
+                                        accept="image/jpeg,image/png,application/pdf"
+                                        onChange={handleScreenshotChange}
+                                        className="hidden"
+                                    />
+                                </label>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -333,42 +407,35 @@ export const PaymentSection: React.FC<PaymentSectionProps> = ({ serviceName, amo
                 </div>
             )}
 
-            {/* Cash instructions */}
+            {/* Cash at Counter Instructions (Module 9) */}
             {paymentMethod === 'cash' && (
-                <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-100 dark:border-amber-500/20 rounded-2xl p-5 animate-in slide-in-from-top-2 duration-300">
-                    <p className="text-xs font-black text-amber-700 dark:text-amber-400 uppercase tracking-widest mb-2">Cash Payment Instructions</p>
-                    <ul className="text-sm text-amber-700/80 dark:text-amber-300/80 font-medium space-y-1">
-                        <li>• Visit Digital Cyber Cafe, Mangolpuri, Delhi</li>
-                        <li>• Pay ₹{amount} cash at the counter</li>
-                        <li>• Your application reference will be confirmed after payment</li>
-                    </ul>
-                </div>
-            )}
-
-            {/* Card instructions */}
-            {paymentMethod === 'card' && (
-                <div className="bg-blue-50 dark:bg-blue-500/10 border border-blue-100 dark:border-blue-500/20 rounded-2xl p-5 animate-in slide-in-from-top-2 duration-300 text-left">
-                    <p className="text-xs font-black text-blue-700 dark:text-blue-400 uppercase tracking-widest mb-2">Card & Net Banking</p>
-                    <p className="text-xs text-slate-600 dark:text-slate-300 font-medium mb-3">
-                        Debit Card, Credit Card, aur Internet Banking se payment karein.
-                    </p>
-                    <div className="p-3 bg-white dark:bg-slate-800 rounded-xl border border-blue-200 dark:border-blue-500/30 text-xs font-mono text-slate-700 dark:text-slate-300">
-                        Amount Payable: ₹{amount} • 256-Bit SSL Secured
+                <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-2xl p-5 animate-in slide-in-from-top-2 duration-300 space-y-3">
+                    <div className="flex items-center gap-2">
+                        <Banknote className="w-5 h-5 text-amber-600" />
+                        <h4 className="text-xs font-black text-amber-800 dark:text-amber-300 uppercase tracking-widest">
+                            Cash at Counter Payment
+                        </h4>
+                    </div>
+                    <div className="text-xs text-amber-800/90 dark:text-amber-200 space-y-1.5 font-medium">
+                        <p>• <strong>Payment Status:</strong> <span className="font-bold text-amber-900 bg-amber-200/60 px-2 py-0.5 rounded">Payment Due at Counter</span></p>
+                        <p>• <strong>Amount Payable:</strong> ₹{amount} (Cash)</p>
+                        <p>• <strong>Cafe Address:</strong> Digital Cyber Cafe, G-663, Mangolpuri, Delhi 110083</p>
+                        <p>• Application submit hone ke baad aap counter par aakar cash jama kar sakte hain. Counter par payment receive hone par status Verified mark ho jayega.</p>
                     </div>
                 </div>
             )}
 
-            {/* Pay Button - Locked until valid UTR is provided */}
+            {/* Pay / Submit Button */}
             <button
                 type="button"
                 onClick={handlePay}
-                disabled={isProcessing || paying || (paymentMethod === 'upi' && !isUtrValid)}
+                disabled={isProcessing || paying || !isPaymentValid}
                 className="w-full py-4 rounded-xl bg-brand dark:bg-emerald-600 text-white font-black text-sm hover:opacity-90 transition-all shadow-xl shadow-brand/25 dark:shadow-emerald-500/25 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 active:scale-95 cursor-pointer"
             >
                 {paying ? (
                     <>
                         <Loader2 className="w-5 h-5 animate-spin" />
-                        Verifying Payment Details...
+                        Recording Payment Evidence...
                     </>
                 ) : isProcessing ? (
                     <>
@@ -380,8 +447,8 @@ export const PaymentSection: React.FC<PaymentSectionProps> = ({ serviceName, amo
                         <Lock className="w-4 h-4" />
                         {paymentMethod === 'cash'
                             ? `Confirm Application (Pay ₹${amount} in Cash)`
-                            : paymentMethod === 'upi' && !isUtrValid
-                                ? `Enter 12-Digit UTR to Submit (₹${amount})`
+                            : !isPaymentValid
+                                ? `Provide UTR or Screenshot to Submit (₹${amount})`
                                 : `Confirm & Submit Application (₹${amount})`}
                     </>
                 )}
@@ -394,7 +461,7 @@ export const PaymentSection: React.FC<PaymentSectionProps> = ({ serviceName, amo
                 </div>
                 <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                     <CheckCircle className="w-3 h-3 text-emerald-500" />
-                    Direct UPI & Bank Transfer
+                    Verified Counter & UPI
                 </div>
             </div>
         </div>
