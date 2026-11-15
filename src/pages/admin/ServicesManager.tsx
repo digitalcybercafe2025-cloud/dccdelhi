@@ -55,7 +55,6 @@ const ServicesManager: React.FC = () => {
     const [activeSubTypeKey, setActiveSubTypeKey] = useState<string>('default');
     const [customSubTypeLabel, setCustomSubTypeLabel] = useState<string>('');
     const [customDocName, setCustomDocName] = useState<string>('');
-    const [showLegacyCategories, setShowLegacyCategories] = useState<boolean>(false);
 
     const API_BASE = 'http://localhost:5000';
 
@@ -116,7 +115,6 @@ const ServicesManager: React.FC = () => {
         setActiveSubTypeKey('default');
         setCustomSubTypeLabel('');
         setCustomDocName('');
-        setShowLegacyCategories(false);
         setError(null); setSuccess(null);
     };
 
@@ -161,7 +159,6 @@ const ServicesManager: React.FC = () => {
         setActiveSubTypeKey(initialConfigs[0]?.subTypeKey || 'default');
         setCustomSubTypeLabel('');
         setCustomDocName('');
-        setShowLegacyCategories(false);
 
         const imgUrl = getMediaUrl(svc.image);
         setImagePreview(imgUrl);
@@ -766,37 +763,6 @@ const ServicesManager: React.FC = () => {
                                         )}
                                     </div>
                                 )}
-
-                                {/* Collapsible Legacy Comma Lists (for backward compatibility) */}
-                                <div className="pt-2 border-t border-slate-200">
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowLegacyCategories(prev => !prev)}
-                                        className="text-[10px] font-black text-slate-400 hover:text-slate-600 uppercase tracking-wider"
-                                    >
-                                        {showLegacyCategories ? '▾ Hide Legacy Category Text Lists' : '▸ Show Legacy Category Text Lists (Optional Fallback)'}
-                                    </button>
-                                    {showLegacyCategories && (
-                                        <div className="mt-3 space-y-2">
-                                            <div>
-                                                <label className="text-[10px] font-black text-red-600 uppercase tracking-widest block mb-1">Mandatory (Comma-separated)</label>
-                                                <input value={form.mandatoryDocs} onChange={e => setForm(f => ({ ...f, mandatoryDocs: e.target.value }))} className={modalInputCls} />
-                                            </div>
-                                            <div>
-                                                <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest block mb-1">Identity Proofs (Any 1)</label>
-                                                <input value={form.idProofs} onChange={e => setForm(f => ({ ...f, idProofs: e.target.value }))} className={modalInputCls} />
-                                            </div>
-                                            <div>
-                                                <label className="text-[10px] font-black text-emerald-600 uppercase tracking-widest block mb-1">Address Proofs (Any 1)</label>
-                                                <input value={form.addressProofs} onChange={e => setForm(f => ({ ...f, addressProofs: e.target.value }))} className={modalInputCls} />
-                                            </div>
-                                            <div>
-                                                <label className="text-[10px] font-black text-amber-600 uppercase tracking-widest block mb-1">Other Supporting (Optional)</label>
-                                                <input value={form.otherDocs} onChange={e => setForm(f => ({ ...f, otherDocs: e.target.value }))} className={modalInputCls} />
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
                             </div>
                             <div className="col-span-2">
                                 <label className={labelCls}>Estimated Processing Timeline</label>
