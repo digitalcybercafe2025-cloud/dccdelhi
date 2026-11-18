@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { CAROUSEL_IMAGES } from '../constants';
-import { ChevronRight, BellRing, Sparkles, ShieldCheck, Zap, AlertTriangle, Briefcase, Megaphone, CreditCard, Info, Clock, X, ExternalLink } from 'lucide-react';
+import { ChevronRight, ChevronLeft, BellRing, Sparkles, ShieldCheck, Zap, AlertTriangle, Briefcase, Megaphone, CreditCard, Info, Clock, X, ExternalLink } from 'lucide-react';
 import { getMediaUrl } from '../src/api/axios';
 import api from '../src/api/axios';
 
@@ -39,12 +39,29 @@ const DEFAULT_SETTINGS: NoticeSettings = {
   infiniteLoop: true,
 };
 
+interface CarouselSettings {
+  heroAutoplay: boolean;
+  heroInterval: number;
+  heroShowIndicators: boolean;
+  heroShowArrows: boolean;
+  heroTransition: string;
+}
+
+const DEFAULT_CAROUSEL_SETTINGS: CarouselSettings = {
+  heroAutoplay: true,
+  heroInterval: 5,
+  heroShowIndicators: true,
+  heroShowArrows: true,
+  heroTransition: 'fade'
+};
+
 const hasValidText = (val: any): boolean => {
   return typeof val === 'string' && val.trim().length > 0;
 };
 
 export const Hero: React.FC<HeroProps> = ({ messages = [], slides = [] }) => {
   const [activeSlide, setActiveSlide] = useState(0);
+  const [carouselSettings, setCarouselSettings] = useState<CarouselSettings>(DEFAULT_CAROUSEL_SETTINGS);
   const [startIndex, setStartIndex] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
@@ -72,6 +89,30 @@ export const Hero: React.FC<HeroProps> = ({ messages = [], slides = [] }) => {
       }
     };
     fetchSettings();
+    return () => { isMounted = false; };
+  }, []);
+
+  // Fetch Hero Carousel playback and display settings
+  useEffect(() => {
+    let isMounted = true;
+    const fetchCarouselConfig = async () => {
+      try {
+        const res = await api.get('/settings');
+        if (res.data?.success && res.data.data && isMounted) {
+          const d = res.data.data;
+          setCarouselSettings({
+            heroAutoplay: d.heroAutoplay !== undefined ? Boolean(d.heroAutoplay) : true,
+            heroInterval: Number(d.heroInterval) || 5,
+            heroShowIndicators: d.heroShowIndicators !== undefined ? Boolean(d.heroShowIndicators) : true,
+            heroShowArrows: d.heroShowArrows !== undefined ? Boolean(d.heroShowArrows) : true,
+            heroTransition: d.heroTransition || 'fade'
+          });
+        }
+      } catch (e) {
+        // Fallback to default
+      }
+    };
+    fetchCarouselConfig();
     return () => { isMounted = false; };
   }, []);
 
@@ -181,12 +222,13 @@ export const Hero: React.FC<HeroProps> = ({ messages = [], slides = [] }) => {
 
   // Slide Carousel interval
   useEffect(() => {
-    if (displaySlides.length <= 1) return;
+    if (displaySlides.length <= 1 || !carouselSettings.heroAutoplay) return;
+    const intervalMs = Math.max(2, carouselSettings.heroInterval || 5) * 1000;
     const timer = setInterval(() => {
       setActiveSlide((prev) => (prev + 1) % displaySlides.length);
-    }, 10000);
+    }, intervalMs);
     return () => clearInterval(timer);
-  }, [displaySlides.length]);
+  }, [displaySlides.length, carouselSettings.heroAutoplay, carouselSettings.heroInterval]);
 
   // Modal lock body
   useEffect(() => {
@@ -290,16 +332,27 @@ export const Hero: React.FC<HeroProps> = ({ messages = [], slides = [] }) => {
     <section className="py-4 md:py-10 px-4 md:px-8 max-w-[1500px] mx-auto">
       <div className="flex flex-col lg:flex-row gap-6 md:gap-8">
         
-        {/* CAROUSEL CONTAINER (LEFT 65%) */}
+        {/* CAROUSEL CONTAINER (LEFT 60%) */}
         <div
-          className="lg:w-[65%] relative h-[380px] sm:h-[450px] md:h-[440px] rounded-[28px] md:rounded-[32px] p-[1.5px] shadow-2xl luxury-shadow flex flex-col group transition-all duration-700"
+          className="lg:w-[60%] relative h-[380px] sm:h-[450px] md:h-[440px] rounded-[28px] md:rounded-[32px] p-[1.5px] shadow-2xl luxury-shadow flex flex-col group transition-all duration-700"
           style={{ background: 'linear-gradient(135deg, rgba(241, 26, 26, 0.61), rgba(34,197,94,0.4), rgba(7, 90, 224, 0.4), rgba(8, 234, 200, 0.4))' }}
         >
           <div className="w-full h-full bg-[#fcfdfd] dark:bg-slate-900 rounded-[26px] md:rounded-[30px] relative overflow-hidden">
-            {displaySlides.map((slide, idx) => (
+            {displaySlides.map((slide, idx) => {
+              const isCurrent = idx === activeSlide;
+              let transitionClass = 'transition-all duration-[2000ms] ease-in-out ';
+              if (carouselSettings.heroTransition === 'zoom') {
+                transitionClass += isCurrent ? 'opacity-100 scale-100 z-10' : 'opacity-0 scale-110 z-0';
+              } else if (carouselSettings.heroTransition === 'slide') {
+                transitionClass += isCurrent ? 'opacity-100 translate-x-0 z-10' : 'opacity-0 translate-x-12 z-0';
+              } else {
+                transitionClass += isCurrent ? 'opacity-100 scale-100 z-10' : 'opacity-0 scale-[1.03] z-0';
+              }
+
+              return (
               <div
                 key={idx}
-                className={`absolute inset-0 p-2 md:p-3 transition-all duration-[2500ms] ease-in-out ${idx === activeSlide ? 'opacity-100 scale-100 z-10' : 'opacity-0 scale-[1.05] z-0'}`}
+                className={`absolute inset-0 p-2 md:p-3 ${transitionClass}`}
               >
                 <div className="w-full h-full relative rounded-[20px] md:rounded-[24px] overflow-hidden bg-slate-100/50 dark:bg-slate-900/50">
                   <img
@@ -339,22 +392,49 @@ export const Hero: React.FC<HeroProps> = ({ messages = [], slides = [] }) => {
                   )}
                 </div>
               </div>
-            ))}
-            <div className="absolute bottom-6 md:bottom-11 left-6 md:left-12 flex gap-2 md:gap-3 z-20">
-              {displaySlides.map((_, idx) => (
+              );
+            })}
+
+            {/* CHEVRON NAVIGATION ARROWS */}
+            {carouselSettings.heroShowArrows && displaySlides.length > 1 && (
+              <>
                 <button
-                  key={idx}
-                  onClick={() => setActiveSlide(idx)}
-                  className={`h-1 md:h-1.5 rounded-full transition-all duration-1000 ${idx === activeSlide ? 'bg-brand dark:bg-emerald-500 w-12 md:w-16 shadow-lg' : 'bg-slate-300 dark:bg-white/40 w-3 md:w-4 hover:bg-slate-400'}`}
-                />
-              ))}
-            </div>
+                  type="button"
+                  onClick={() => setActiveSlide((prev) => (prev - 1 + displaySlides.length) % displaySlides.length)}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 z-20 w-9 h-9 md:w-10 md:h-10 rounded-full bg-slate-900/40 hover:bg-slate-900/80 text-white backdrop-blur-md flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 shadow-lg hover:scale-105 active:scale-95"
+                  aria-label="Previous Slide"
+                >
+                  <ChevronLeft className="w-5 h-5 -translate-x-0.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveSlide((prev) => (prev + 1) % displaySlides.length)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 z-20 w-9 h-9 md:w-10 md:h-10 rounded-full bg-slate-900/40 hover:bg-slate-900/80 text-white backdrop-blur-md flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 shadow-lg hover:scale-105 active:scale-95"
+                  aria-label="Next Slide"
+                >
+                  <ChevronRight className="w-5 h-5 translate-x-0.5" />
+                </button>
+              </>
+            )}
+
+            {/* BOTTOM INDICATOR DOTS */}
+            {carouselSettings.heroShowIndicators && displaySlides.length > 1 && (
+              <div className="absolute bottom-6 md:bottom-11 left-6 md:left-12 flex gap-2 md:gap-3 z-20">
+                {displaySlides.map((_, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setActiveSlide(idx)}
+                    className={`h-1 md:h-1.5 rounded-full transition-all duration-1000 ${idx === activeSlide ? 'bg-brand dark:bg-emerald-500 w-12 md:w-16 shadow-lg' : 'bg-slate-300 dark:bg-white/40 w-3 md:w-4 hover:bg-slate-400'}`}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* IMPORTANT LIVE NOTICES BOX (RIGHT 35%) - EXACT MATCH WITH REFERENCE IMAGE */}
+        {/* IMPORTANT LIVE NOTICES BOX (RIGHT 40%) - EXACT MATCH WITH REFERENCE IMAGE */}
         <div
-          className="lg:w-[35%] min-h-[350px] md:h-[440px] rounded-[28px] md:rounded-[32px] p-[1.5px] shadow-2xl luxury-shadow flex flex-col relative group transition-all duration-700"
+          className="lg:w-[40%] min-h-[350px] md:h-[440px] rounded-[28px] md:rounded-[32px] p-[1.5px] shadow-2xl luxury-shadow flex flex-col relative group transition-all duration-700"
           style={{ background: 'linear-gradient(135deg, rgba(255,75,75,0.7), rgba(234,179,8,0.7), rgba(34,197,94,0.7), rgba(59,130,246,0.7))' }}
           onMouseEnter={() => setIsHovered(true)}
           onMouseLeave={() => setIsHovered(false)}
@@ -399,7 +479,12 @@ export const Hero: React.FC<HeroProps> = ({ messages = [], slides = [] }) => {
                   return (
                     <div
                       key={noticeId}
-                      className={`${getCardHeightClass()} rounded-[20px] bg-white dark:bg-slate-800/90 shadow-[0_4px_20px_rgba(0,0,0,0.04)] border border-slate-100 dark:border-slate-700/80 flex gap-3 sm:gap-4 items-center relative overflow-hidden transition-all duration-300`}
+                      className={`${getCardHeightClass()} rounded-[20px] bg-white dark:bg-slate-800/90 shadow-[0_4px_20px_rgba(0,0,0,0.04)] border border-slate-100 dark:border-slate-700/80 flex gap-3 sm:gap-4 items-start relative overflow-hidden transition-all duration-300 ${msg.actionUrl ? 'cursor-pointer hover:border-blue-200 dark:hover:border-blue-500/30' : ''}`}
+                      onClick={() => {
+                        if (msg.actionUrl) {
+                          window.open(msg.actionUrl, msg.actionUrl.startsWith('http') ? '_blank' : '_self');
+                        }
+                      }}
                     >
                       {/* Soft ambient tint on left matching reference cards */}
                       <div
@@ -411,50 +496,71 @@ export const Hero: React.FC<HeroProps> = ({ messages = [], slides = [] }) => {
                       />
 
                       {/* Icon Container */}
-                      <div className="shrink-0 w-12 h-12 sm:w-14 sm:h-14 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 flex items-center justify-center z-10">
+                      <div className="shrink-0 w-11 h-11 sm:w-13 sm:h-13 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 flex items-center justify-center z-10 mt-0.5">
                         {renderNoticeIcon(msg)}
                       </div>
 
                       {/* Vertical separator line matching reference screenshot */}
-                      <div className="h-8 sm:h-10 w-[1.5px] bg-slate-200/80 dark:bg-slate-700 shrink-0 z-10" />
+                      <div className="h-8 sm:h-10 w-[1.5px] bg-slate-200/80 dark:bg-slate-700 shrink-0 z-10 mt-1" />
 
                       {/* Notice Content */}
                       <div className="flex-1 min-w-0 z-10 flex flex-col justify-center">
                         {/* Title and Live Badge */}
                         <div className="flex items-center gap-2 flex-wrap mb-1">
-                          <h4 className="text-[#0f172a] dark:text-white font-extrabold text-[14px] sm:text-[15px] uppercase tracking-tight line-clamp-1">
+                          <h4 className="text-[#0f172a] dark:text-white font-extrabold text-[13px] sm:text-[14px] uppercase tracking-tight line-clamp-2 leading-snug">
                             {noticeTitle}
                           </h4>
                         </div>
 
-                        <div className="mb-1">
-                          <span className="bg-[#fff1f2] dark:bg-rose-500/15 text-[#f43f5e] dark:text-rose-400 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider inline-block">
+                        <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                          <span className="bg-[#fff1f2] dark:bg-rose-500/15 text-[#f43f5e] dark:text-rose-400 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider inline-block">
                             {msg.badge || 'LIVE'}
                           </span>
+                          {msg.type && msg.type !== 'Important' && (
+                            <span className="bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase">
+                              {msg.type}
+                            </span>
+                          )}
                         </div>
 
                         {/* Description Preview or Expanded */}
-                        <div className="flex items-end justify-between gap-2">
+                        <div className="flex flex-col gap-1.5">
                           <p
-                            className={`text-[12px] sm:text-[13px] text-slate-600 dark:text-slate-300 font-medium leading-snug ${
-                              isExpanded ? 'max-h-32 overflow-y-auto pr-1' : 'line-clamp-2'
+                            className={`text-[12px] sm:text-[13px] text-slate-600 dark:text-slate-300 font-medium leading-relaxed ${
+                              isExpanded ? 'max-h-40 overflow-y-auto pr-1.5 custom-scroll' : 'line-clamp-2'
                             }`}
                           >
                             {renderHighlightedText(descriptionText)}
                           </p>
 
-                          {/* See More / See Less Toggle */}
-                          {descriptionText.length > 50 && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setExpandedNoticeId(isExpanded ? null : noticeId);
-                              }}
-                              className="text-blue-600 hover:text-blue-700 dark:text-blue-400 font-bold text-[12px] sm:text-[13px] inline-flex items-center gap-0.5 shrink-0 whitespace-nowrap cursor-pointer select-none transition-colors ml-auto pl-1"
-                            >
-                              {isExpanded ? 'See Less <' : 'See More >'}
-                            </button>
-                          )}
+                          <div className="flex items-center justify-between gap-2 pt-0.5 flex-wrap">
+                            {/* Action Button: Works with actionUrl or default label */}
+                            {msg.actionUrl ? (
+                              <a
+                                href={msg.actionUrl}
+                                target={msg.actionUrl.startsWith('http') ? '_blank' : '_self'}
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="inline-flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg text-[10px] sm:text-[11px] font-black uppercase tracking-wider transition-all shadow-sm hover:scale-105 active:scale-95 group/btn"
+                              >
+                                <span>{msg.actionText || 'Apply Now / View Details'}</span>
+                                <ExternalLink className="w-3 h-3 group-hover/btn:translate-x-0.5 transition-transform" />
+                              </a>
+                            ) : <span />}
+
+                            {/* See More / See Less Toggle */}
+                            {descriptionText.length > 50 && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setExpandedNoticeId(isExpanded ? null : noticeId);
+                                }}
+                                className="text-blue-600 hover:text-blue-700 dark:text-blue-400 font-bold text-[11px] sm:text-[12px] inline-flex items-center gap-0.5 shrink-0 whitespace-nowrap cursor-pointer select-none transition-colors ml-auto pl-1"
+                              >
+                                {isExpanded ? 'See Less <' : 'See More >'}
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>

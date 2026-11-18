@@ -1,4 +1,7 @@
 const Application = require('../models/Application');
+const Service = require('../models/Service');
+const Testimonial = require('../models/Testimonial');
+const Inquiry = require('../models/Inquiry');
 
 // @desc  Get all payments (extracted from applications)
 // @route GET /api/payments
@@ -151,36 +154,115 @@ const exportPayments = async (req, res) => {
     }
 };
 
-// @desc  Dashboard stats
+// @desc  Dashboard stats (100% Real data from MongoDB)
 // @route GET /api/payments/stats
 const getStats = async (req, res) => {
     try {
         const total = await Application.countDocuments();
+        const totalServices = await Service.countDocuments();
         const pending = await Application.countDocuments({ status: 'received' });
         const reviewing = await Application.countDocuments({ status: 'review' });
         const verifying = await Application.countDocuments({ status: 'verifying' });
         const completed = await Application.countDocuments({ status: 'completed' });
         const rejected = await Application.countDocuments({ status: 'rejected' });
 
+        // Applications received today
+        const startOfToday = new Date();
+        startOfToday.setHours(0, 0, 0, 0);
+        const newToday = await Application.countDocuments({ createdAt: { $gte: startOfToday } });
+
+        // Total Paid Earnings (case-insensitive check for Paid/PAID)
         const earningsAgg = await Application.aggregate([
-            { $match: { 'paymentDetails.paymentStatus': 'Paid' } },
+            { $match: { 'paymentDetails.paymentStatus': { $in: ['Paid', 'PAID', 'paid'] } } },
             { $group: { _id: null, total: { $sum: '$paymentDetails.amount' } } }
         ]);
         const totalEarnings = earningsAgg[0]?.total || 0;
 
+        // Current Month Earnings
+        const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+        const thisMonthAgg = await Application.aggregate([
+            {
+                $match: {
+                    'paymentDetails.paymentStatus': { $in: ['Paid', 'PAID', 'paid'] },
+                    createdAt: { $gte: startOfMonth }
+                }
+            },
+            { $group: { _id: null, total: { $sum: '$paymentDetails.amount' } } }
+        ]);
+        const thisMonthEarnings = thisMonthAgg[0]?.total || 0;
+
+        // Real Monthly Earnings for last 5 months
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const currentYear = new Date().getFullYear();
+        const currentMonth = new Date().getMonth();
+        const monthlyDataMap = {};
+        for (let i = 4; i >= 0; i--) {
+            const d = new Date(currentYear, currentMonth - i, 1);
+            const mKey = `${d.getFullYear()}-${d.getMonth()}`;
+            monthlyDataMap[mKey] = { m: months[d.getMonth()], v: 0, year: d.getFullYear(), month: d.getMonth() };
+        }
+        const fiveMonthsAgo = new Date(currentYear, currentMonth - 4, 1);
+        const monthlyAgg = await Application.aggregate([
+            {
+                $match: {
+                    'paymentDetails.paymentStatus': { $in: ['Paid', 'PAID', 'paid'] },
+                    createdAt: { $gte: fiveMonthsAgo }
+                }
+            },
+            {
+                $group: {
+                    _id: {
+                        year: { $year: '$createdAt' },
+                        month: { $subtract: [{ $month: '$createdAt' }, 1] }
+                    },
+                    total: { $sum: '$paymentDetails.amount' }
+                }
+            }
+        ]);
+        monthlyAgg.forEach(item => {
+            const key = `${item._id.year}-${item._id.month}`;
+            if (monthlyDataMap[key]) {
+                monthlyDataMap[key].v = item.total || 0;
+            }
+        });
+        const monthlyEarnings = Object.values(monthlyDataMap);
+
+        // Real Popular Services volume
+        const serviceAgg = await Application.aggregate([
+            { $match: { serviceName: { $exists: true, $ne: '' } } },
+            { $group: { _id: '$serviceName', count: { $sum: 1 } } },
+            { $sort: { count: -1 } },
+            { $limit: 5 }
+        ]);
+        let popularServices = serviceAgg.map(s => ({ name: s._id, count: s.count }));
+        if (popularServices.length === 0) {
+            const actualServices = await Service.find({ isActive: { $ne: false } }).limit(5).select('title name');
+            popularServices = actualServices.map(s => ({ name: s.title || s.name, count: 0 }));
+        }
+
+        // Real Recent Testimonials
+        const recentTestimonials = await Testimonial.find().sort({ createdAt: -1 }).limit(3).select('name message createdAt');
+
+        // Real Recent Inquiries/Messages
+        const recentMessages = await Inquiry.find().sort({ createdAt: -1 }).limit(3).select('name message createdAt');
+
+        // Real Success Rate calculation
+        const processedTotal = completed + rejected;
+        const successRate = processedTotal > 0 ? ((completed / processedTotal) * 100).toFixed(1) : '100';
+
         let recent = await Application.find({})
             .sort({ createdAt: -1 })
             .limit(10)
-            .select('trackingId serviceName userDetails.fullName userDetails.mobile status createdAt paymentDetails.amount documents');
+            .select('trackingId serviceName userDetails.fullName userDetails.mobile status createdAt paymentDetails.amount paymentDetails.paymentStatus documents');
 
         recent = recent.map(app => {
             const appObj = app.toObject();
             if (appObj.documents) {
                 appObj.documents = appObj.documents.map(doc => ({
                     ...doc,
-                    filePath: doc.filePath.includes('uploads/')
+                    filePath: doc.filePath && doc.filePath.includes('uploads/')
                         ? doc.filePath.substring(doc.filePath.indexOf('uploads/'))
-                        : doc.filePath
+                        : (doc.filePath || '')
                 }));
             }
             return appObj;
@@ -188,7 +270,24 @@ const getStats = async (req, res) => {
 
         res.json({
             success: true,
-            data: { total, pending, reviewing, verifying, completed, rejected, totalEarnings, recent }
+            data: {
+                total,
+                totalServices,
+                newToday,
+                pending,
+                reviewing,
+                verifying,
+                completed,
+                rejected,
+                totalEarnings,
+                thisMonthEarnings,
+                monthlyEarnings,
+                popularServices,
+                recentTestimonials,
+                recentMessages,
+                successRate,
+                recent
+            }
         });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });

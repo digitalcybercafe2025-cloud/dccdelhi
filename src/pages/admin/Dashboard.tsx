@@ -6,10 +6,23 @@ import {
     LineChart, Line, XAxis, YAxis, CartesianGrid
 } from 'recharts';
 
-// ── Types ────────────────────────────────────────────────────────────────────
+// ── Types (100% Real Database Schema) ─────────────────────────────────────────
 interface Stats {
-    total: number; pending: number; reviewing: number; verifying: number;
-    completed: number; rejected: number; totalEarnings: number;
+    total: number;
+    totalServices: number;
+    newToday: number;
+    pending: number;
+    reviewing: number;
+    verifying: number;
+    completed: number;
+    rejected: number;
+    totalEarnings: number;
+    thisMonthEarnings: number;
+    monthlyEarnings: Array<{ m: string; v: number }>;
+    popularServices: Array<{ name: string; count: number }>;
+    recentTestimonials: Array<{ name: string; message: string; createdAt: string }>;
+    recentMessages: Array<{ name: string; message: string; createdAt: string }>;
+    successRate: string;
     recent: any[];
 }
 
@@ -33,26 +46,42 @@ const avatarBg = (name: string) => {
     return colors[idx];
 };
 
+const formatTimeAgo = (dateStr: string) => {
+    if (!dateStr) return 'Recently';
+    const diff = (Date.now() - new Date(dateStr).getTime()) / 1000;
+    if (diff < 60) return 'Just now';
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
+    return new Date(dateStr).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+};
+
 // ── Stat Card (matches screenshot gradient style) ─────────────────────────────
-const StatCard: React.FC<{ label: string; value: number | string; gradient: string; iconPath: string; sub?: string }> = ({ label, value, gradient, iconPath, sub }) => {
-    const [displayValue, setDisplayValue] = useState<any>(0);
+const StatCard: React.FC<{ label: string; value: number | string; gradient: string; iconPath: string; isCurrency?: boolean }> = ({ label, value, gradient, iconPath, isCurrency }) => {
+    const [displayValue, setDisplayValue] = useState<number>(0);
+    const numValue = typeof value === 'number' ? value : Number(String(value).replace(/[^0-9.-]+/g, '')) || 0;
 
     useEffect(() => {
-        if (typeof value === 'number') {
-            let start = 0;
-            const end = value;
-            const duration = 1000;
-            const stepTime = Math.abs(Math.floor(duration / end));
-            const timer = setInterval(() => {
-                start += 1;
-                setDisplayValue(start);
-                if (start >= end) clearInterval(timer);
-            }, stepTime || 50);
-            return () => clearInterval(timer);
-        } else {
-            setDisplayValue(value);
+        if (numValue === 0) {
+            setDisplayValue(0);
+            return;
         }
-    }, [value]);
+        let start = 0;
+        const end = numValue;
+        const duration = 800;
+        const stepTime = Math.max(Math.floor(duration / Math.min(end, 50)), 15);
+        const increment = Math.ceil(end / 40) || 1;
+        const timer = setInterval(() => {
+            start += increment;
+            if (start >= end) {
+                setDisplayValue(end);
+                clearInterval(timer);
+            } else {
+                setDisplayValue(start);
+            }
+        }, stepTime);
+        return () => clearInterval(timer);
+    }, [numValue]);
 
     return (
         <div className={`${gradient} rounded-3xl p-6 text-white flex flex-col gap-4 min-w-0 shadow-lg relative overflow-hidden group hover:scale-[1.02] transition-all duration-300`}>
@@ -66,8 +95,9 @@ const StatCard: React.FC<{ label: string; value: number | string; gradient: stri
             <div className="flex items-start justify-between relative z-10">
                 <div className="space-y-1">
                     <p className="text-white/70 text-[10px] font-black uppercase tracking-[0.15em]">{label}</p>
-                    <p className="text-4xl font-black tracking-tighter tabular-nums">{displayValue}</p>
-                    {sub && <p className="text-white/60 text-[11px] font-bold mt-1">{sub}</p>}
+                    <p className="text-4xl font-black tracking-tighter tabular-nums">
+                        {isCurrency ? `₹${displayValue.toLocaleString('en-IN')}` : displayValue}
+                    </p>
                 </div>
                 <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center flex-shrink-0 shadow-inner">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -87,20 +117,6 @@ const StatCard: React.FC<{ label: string; value: number | string; gradient: stri
     );
 };
 
-// ── Earnings mock monthly data ────────────────────────────────────────────────
-const EARNING_DATA = [
-    { m: 'Jan', v: 8500 }, { m: 'Feb', v: 12000 }, { m: 'Mar', v: 9800 },
-    { m: 'Apr', v: 14200 }, { m: 'May', v: 18750 },
-];
-
-// ── popular services (mocked from app data) ───────────────────────────────────
-const POPULAR_SERVICES = [
-    { name: 'Income Certificate', count: 8 },
-    { name: 'New PAN Card', count: 3 },
-    { name: 'Driving License', count: 12 },
-    { name: 'E-Shram Card', count: 3 },
-];
-
 // ── Main Dashboard ────────────────────────────────────────────────────────────
 const Dashboard: React.FC = () => {
     const navigate = useNavigate();
@@ -110,11 +126,15 @@ const Dashboard: React.FC = () => {
     const [dateFilter, setDateFilter] = useState('this_month');
     const [actionMenuOpenId, setActionMenuOpenId] = useState<string | null>(null);
 
-    useEffect(() => {
+    const fetchDashboardStats = () => {
         api.get('/admin/dashboard')
             .then(res => setStats(res.data.data))
             .catch(console.error)
             .finally(() => setLoading(false));
+    };
+
+    useEffect(() => {
+        fetchDashboardStats();
     }, []);
 
     if (loading) return (
@@ -124,14 +144,18 @@ const Dashboard: React.FC = () => {
     );
     if (!stats) return <div className="text-red-500 text-center py-20 font-bold">Failed to load dashboard data.</div>;
 
-    const pendingCount = stats.pending;
-    const inProcessCount = stats.reviewing + stats.verifying;
-    const acceptedCount = stats.completed;
+    const pendingCount = stats.pending || 0;
+    const inProcessCount = (stats.reviewing || 0) + (stats.verifying || 0);
+    const acceptedCount = stats.completed || 0;
+    const totalAppsInPie = pendingCount + inProcessCount + acceptedCount;
 
-    const donutData = [
-        { name: 'Pending', value: Math.max(pendingCount, 1), color: '#f59e0b' },
-        { name: 'In Process', value: Math.max(inProcessCount, 1), color: '#3b82f6' },
-        { name: 'Accepted', value: Math.max(acceptedCount, 1), color: '#10b981' },
+    // Donut chart: 100% Real counts without artificial minimums
+    const donutData = totalAppsInPie > 0 ? [
+        { name: 'Pending', value: pendingCount, color: '#f59e0b' },
+        { name: 'In Process', value: inProcessCount, color: '#3b82f6' },
+        { name: 'Accepted', value: acceptedCount, color: '#10b981' },
+    ] : [
+        { name: 'No Applications', value: 1, color: '#e2e8f0' }
     ];
 
     const now = new Date();
@@ -190,34 +214,30 @@ const Dashboard: React.FC = () => {
 
     return (
         <div className="space-y-5">
-
-            {/* ── STAT CARDS ── */}
+            {/* ── TOP 4 STAT CARDS (Gradient Style - Real DB Data) ── */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
                 <StatCard
                     label="Total Services"
-                    value={stats.total}
+                    value={stats.totalServices || 0}
                     gradient="stat-card-blue"
                     iconPath="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
                 />
                 <StatCard
                     label="New Applications"
-                    value={stats.recent.filter((a: any) => {
-                        const date = new Date(a.createdAt);
-                        const now = new Date();
-                        return date.getDate() === now.getDate() && date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
-                    }).length}
+                    value={stats.newToday || 0}
                     gradient="stat-card-green"
                     iconPath="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
                 />
                 <StatCard
                     label="Pending Applications"
-                    value={stats.pending}
+                    value={stats.pending || 0}
                     gradient="stat-card-orange"
                     iconPath="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
                 />
                 <StatCard
                     label="Total Earnings"
-                    value={`₹${stats.totalEarnings.toLocaleString('en-IN')}`}
+                    value={stats.totalEarnings || 0}
+                    isCurrency={true}
                     gradient="stat-card-dark"
                     iconPath="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                 />
@@ -408,10 +428,9 @@ const Dashboard: React.FC = () => {
                 </div>
             </div>
 
-            {/* ── BOTTOM ROW: 3 columns ── */}
+            {/* ── BOTTOM ROW: 3 columns (Real Data from MongoDB) ── */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-
-                {/* ── Col 1: Popular Services (Corrected Heading) ── */}
+                {/* ── Col 1: Popular Services ── */}
                 <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden border-b-4 border-b-blue-500/10">
                     <div className="px-6 py-5 flex items-center justify-between border-b border-slate-100">
                         <h3 className="font-black text-slate-800 text-sm flex items-center gap-2">
@@ -419,37 +438,41 @@ const Dashboard: React.FC = () => {
                             Popular Services
                         </h3>
                         <div className="flex gap-2">
-                            <button className="text-[10px] font-black uppercase tracking-widest border border-slate-100 rounded-xl px-3 py-1.5 text-slate-400 hover:bg-slate-50 transition-colors">Export</button>
-                            <button onClick={() => navigate('/admin/services')} className="text-[10px] font-black uppercase tracking-widest bg-emerald-500 text-white rounded-xl px-3 py-1.5 hover:bg-emerald-600 transition-colors shadow-lg shadow-emerald-500/20">Manage</button>
+                            <button onClick={() => navigate('/admin/services')} className="text-[10px] font-black uppercase tracking-widest bg-emerald-500 text-white rounded-xl px-3 py-1.5 hover:bg-emerald-600 transition-colors shadow-lg shadow-emerald-500/20">
+                                Manage
+                            </button>
                         </div>
                     </div>
                     <div className="px-6 py-3 bg-slate-50/50">
                         <div className="flex justify-between text-[10px] font-black uppercase text-slate-400 tracking-[0.2em]">
                             <span>Service Title</span>
-                            <span className="flex items-center gap-1">Volume</span>
+                            <span>Applications</span>
                         </div>
                     </div>
                     <div className="divide-y divide-slate-50">
-                        {POPULAR_SERVICES.map((s, i) => (
-                            <div key={s.name} className="px-6 py-4 flex items-center justify-between hover:bg-blue-50/30 transition-colors group">
-                                <div className="flex items-center gap-4">
-                                    <span className="text-xs font-black text-slate-300 group-hover:text-blue-500 transition-colors">0{i + 1}</span>
-                                    <span className="text-sm font-bold text-slate-700">{s.name}</span>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <div className="px-3 py-1 rounded-lg bg-slate-100 text-slate-800 text-xs font-black group-hover:bg-blue-600 group-hover:text-white transition-all">
-                                        {s.count}
+                        {(stats.popularServices && stats.popularServices.length > 0) ? (
+                            stats.popularServices.map((s, i) => (
+                                <div key={s.name || i} className="px-6 py-4 flex items-center justify-between hover:bg-blue-50/30 transition-colors group">
+                                    <div className="flex items-center gap-4">
+                                        <span className="text-xs font-black text-slate-300 group-hover:text-blue-500 transition-colors">0{i + 1}</span>
+                                        <span className="text-sm font-bold text-slate-700 truncate max-w-[160px]">{s.name}</span>
                                     </div>
-                                    <button className="p-1.5 rounded-lg text-slate-300 hover:bg-white hover:text-blue-500 hover:shadow-sm transition-all active:scale-90">
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
-                                    </button>
+                                    <div className="flex items-center gap-3">
+                                        <div className="px-3 py-1 rounded-lg bg-slate-100 text-slate-800 text-xs font-black group-hover:bg-blue-600 group-hover:text-white transition-all">
+                                            {s.count}
+                                        </div>
+                                    </div>
                                 </div>
+                            ))
+                        ) : (
+                            <div className="p-8 text-center text-xs text-slate-400 font-bold">
+                                No service applications yet
                             </div>
-                        ))}
+                        )}
                     </div>
                 </div>
 
-                {/* ── Col 2: Applications Summary (Donut) + Earnings Summary ── */}
+                {/* ── Col 2: Applications Summary (Donut) + Earnings Trends ── */}
                 <div className="flex flex-col gap-5">
                     {/* Donut chart */}
                     <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 flex-1 flex flex-col justify-between border-b-4 border-b-emerald-500/10">
@@ -461,9 +484,9 @@ const Dashboard: React.FC = () => {
                             <div className="w-32 h-32 flex-shrink-0 relative">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <PieChart>
-                                        <Pie data={donutData} cx="50%" cy="50%" innerRadius={35} outerRadius={55} dataKey="value" strokeWidth={0} paddingAngle={5}>
-                                            {donutData.map((entry) => (
-                                                <Cell key={entry.name} fill={entry.color} />
+                                        <Pie data={donutData} cx="50%" cy="50%" innerRadius={35} outerRadius={55} dataKey="value" strokeWidth={0} paddingAngle={totalAppsInPie > 0 ? 5 : 0}>
+                                            {donutData.map((entry, idx) => (
+                                                <Cell key={idx} fill={entry.color} />
                                             ))}
                                         </Pie>
                                         <Tooltip contentStyle={{ fontSize: 10, fontWeight: 900, borderRadius: 12, border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
@@ -471,17 +494,21 @@ const Dashboard: React.FC = () => {
                                 </ResponsiveContainer>
                                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                                     <span className="text-xs font-black text-slate-400 uppercase tracking-tighter">Total</span>
-                                    <span className="text-xl font-black text-slate-800">{stats.total}</span>
+                                    <span className="text-xl font-black text-slate-800">{stats.total || 0}</span>
                                 </div>
                             </div>
                             <div className="grid grid-cols-1 gap-2.5 flex-1 max-w-[120px]">
-                                {donutData.map(d => (
+                                {[
+                                    { name: 'Pending', count: pendingCount, color: '#f59e0b' },
+                                    { name: 'In Process', count: inProcessCount, color: '#3b82f6' },
+                                    { name: 'Accepted', count: acceptedCount, color: '#10b981' }
+                                ].map(d => (
                                     <div key={d.name} className="flex items-center justify-between group cursor-default">
                                         <div className="flex items-center gap-2">
                                             <span className="w-2 h-2 rounded-full flex-shrink-0 group-hover:scale-125 transition-transform" style={{ background: d.color }} />
                                             <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">{d.name}</span>
                                         </div>
-                                        <span className="text-xs font-black text-slate-900 tabular-nums">{d.value}</span>
+                                        <span className="text-xs font-black text-slate-900 tabular-nums">{d.count}</span>
                                     </div>
                                 ))}
                             </div>
@@ -489,11 +516,11 @@ const Dashboard: React.FC = () => {
                         <div className="mt-4 pt-4 border-t border-slate-50 flex justify-between">
                             <div className="flex flex-col">
                                 <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">Success Rate</span>
-                                <span className="text-sm font-black text-emerald-600 mt-1">94.2%</span>
+                                <span className="text-sm font-black text-emerald-600 mt-1">{stats.successRate || 100}%</span>
                             </div>
                             <div className="flex flex-col items-end">
-                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">Monthly Avg</span>
-                                <span className="text-sm font-black text-blue-600 mt-1">128</span>
+                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">Total Inflow</span>
+                                <span className="text-sm font-black text-blue-600 mt-1">{stats.total || 0}</span>
                             </div>
                         </div>
                     </div>
@@ -505,23 +532,23 @@ const Dashboard: React.FC = () => {
                                 <span className="w-1.5 h-4 bg-slate-800 rounded-full" />
                                 Earnings Trends
                             </h3>
-                            <span className="text-[10px] font-black text-emerald-500 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100 uppercase">+12% vs LY</span>
+                            <span className="text-[10px] font-black text-emerald-500 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100 uppercase">Live DB</span>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4 mb-6">
                             <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100">
                                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">This Month</p>
-                                <p className="text-base font-black text-slate-800">₹{(18750).toLocaleString('en-IN')}</p>
+                                <p className="text-base font-black text-slate-800">₹{(stats.thisMonthEarnings || 0).toLocaleString('en-IN')}</p>
                             </div>
                             <div className="p-3.5 rounded-2xl bg-blue-600 border border-blue-500 shadow-lg shadow-blue-500/20">
-                                <p className="text-[9px] font-black text-white/60 uppercase tracking-widest mb-1">Fiscal Year</p>
-                                <p className="text-base font-black text-white">₹{stats.totalEarnings.toLocaleString('en-IN')}</p>
+                                <p className="text-[9px] font-black text-white/60 uppercase tracking-widest mb-1">Total Revenue</p>
+                                <p className="text-base font-black text-white">₹{(stats.totalEarnings || 0).toLocaleString('en-IN')}</p>
                             </div>
                         </div>
 
                         <div className="h-32 -mx-2">
                             <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={EARNING_DATA} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                                <LineChart data={stats.monthlyEarnings || []} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                                     <defs>
                                         <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
                                             <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1} />
@@ -535,80 +562,84 @@ const Dashboard: React.FC = () => {
                                         contentStyle={{ fontSize: 10, fontWeight: 900, borderRadius: 12, border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
                                         formatter={(v) => [`₹${Number(v).toLocaleString('en-IN')}`, 'Revenue']}
                                     />
-                                    <Line type="monotone" dataKey="v" stroke="#3b82f6" strokeWidth={3} dot={{ fill: '#3b82f6', r: 4, strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, strokeWidth: 0 }} animationDuration={2000} />
+                                    <Line type="monotone" dataKey="v" stroke="#3b82f6" strokeWidth={3} dot={{ fill: '#3b82f6', r: 4, strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, strokeWidth: 0 }} animationDuration={1000} />
                                 </LineChart>
                             </ResponsiveContainer>
                         </div>
                     </div>
                 </div>
 
-                {/* ── Col 3: Testimonials + Messages ── */}
+                {/* ── Col 3: Testimonials + Messages (Real Data from DB) ── */}
                 <div className="flex flex-col gap-5">
                     {/* Recent Testimonials */}
-                    <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden flex-1">
+                    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden flex-1 border-b-4 border-b-amber-500/10">
                         <div className="px-5 py-4 flex items-center justify-between border-b border-slate-100">
                             <h3 className="font-black text-slate-800 text-sm flex items-center gap-2">
-                                <span className="w-1 h-4 bg-orange-500 rounded-full" />
+                                <span className="w-1.5 h-4 bg-amber-500 rounded-full" />
                                 Recent Testimonials
                             </h3>
-                            <button className="text-slate-300 hover:text-slate-500 transition-colors">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg>
+                            <button onClick={() => navigate('/admin/testimonials')} className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800">
+                                View All
                             </button>
                         </div>
                         <div className="divide-y divide-slate-50">
-                            {[
-                                { name: 'Meera Patel', time: '1 week ago', text: 'Excellent service, very helpful stat...' },
-                                { name: 'Sameer Khan', time: '2 weeks ago', text: 'Highly recommend this cyber cafe...' },
-                                { name: 'Pooja Sharma', time: '2 weeks ago', text: 'Quick and easy process, very happy...' }
-                            ].map((t, i) => (
-                                <div key={i} className="px-5 py-3 hover:bg-slate-50 transition-colors">
-                                    <div className="flex justify-between mb-0.5">
-                                        <span className="text-sm font-bold text-blue-600">{i + 1}. {t.name}</span>
-                                        <span className="text-[10px] text-slate-400 font-semibold">{t.time}</span>
+                            {(stats.recentTestimonials && stats.recentTestimonials.length > 0) ? (
+                                stats.recentTestimonials.map((t, i) => (
+                                    <div key={i} className="px-5 py-3 hover:bg-slate-50 transition-colors">
+                                        <div className="flex justify-between mb-0.5">
+                                            <span className="text-xs font-bold text-slate-800">{i + 1}. {t.name}</span>
+                                            <span className="text-[10px] text-slate-400 font-semibold">{formatTimeAgo(t.createdAt)}</span>
+                                        </div>
+                                        <p className="text-xs text-slate-500 line-clamp-2 italic">"{t.message}"</p>
                                     </div>
-                                    <p className="text-xs text-slate-500">{t.text}</p>
+                                ))
+                            ) : (
+                                <div className="p-8 text-center text-xs text-slate-400 font-bold">
+                                    No client testimonials yet
                                 </div>
-                            ))}
+                            )}
                         </div>
                     </div>
 
-                    {/* New Messages */}
-                    <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+                    {/* New Messages / Inquiries */}
+                    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden border-b-4 border-b-blue-500/10">
                         <div className="px-5 py-4 flex items-center justify-between border-b border-slate-100">
                             <h3 className="font-black text-slate-800 text-sm flex items-center gap-2">
-                                <span className="w-1 h-4 bg-orange-500 rounded-full" />
-                                New Messages
+                                <span className="w-1.5 h-4 bg-blue-600 rounded-full" />
+                                Customer Messages
                             </h3>
-                            <button className="text-slate-300 hover:text-slate-500 transition-colors">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg>
+                            <button onClick={() => navigate('/admin/settings')} className="text-[10px] font-bold text-blue-600 hover:text-blue-800">
+                                Inquiries
                             </button>
                         </div>
                         <div className="divide-y divide-slate-50">
-                            {[
-                                { name: 'Rajesh Verma', time: '3 hours ago', text: 'I need help with my PAN card appli...' },
-                                { name: 'Sneha Kapoor', time: '1 day ago', text: 'Can I apply for multiple services a...' },
-                                { name: 'Vikash Thakur', time: '2 days ago', text: 'Please call me regarding my inc...' }
-                            ].map((m, i) => (
-                                <div key={i} className="px-5 py-3 hover:bg-slate-50 transition-colors flex items-center gap-3">
-                                    <div className={`w-8 h-8 rounded-full ${['bg-blue-500', 'bg-green-500', 'bg-purple-500'][i]} flex items-center justify-center text-white text-[10px] font-black flex-shrink-0`}>
-                                        {initials(m.name)}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex justify-between mb-0.5">
-                                            <span className="text-xs font-bold text-slate-700">{m.name}</span>
-                                            <span className="text-[10px] text-slate-400 font-semibold">{m.time}</span>
+                            {(stats.recentMessages && stats.recentMessages.length > 0) ? (
+                                stats.recentMessages.map((m, i) => (
+                                    <div key={i} className="px-5 py-3 hover:bg-slate-50 transition-colors flex items-center gap-3">
+                                        <div className={`w-8 h-8 rounded-full ${['bg-blue-500', 'bg-emerald-500', 'bg-purple-500'][i % 3]} flex items-center justify-center text-white text-[10px] font-black flex-shrink-0`}>
+                                            {initials(m.name)}
                                         </div>
-                                        <p className="text-[11px] text-slate-500 truncate">{m.text}</p>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex justify-between mb-0.5">
+                                                <span className="text-xs font-bold text-slate-800">{m.name}</span>
+                                                <span className="text-[10px] text-slate-400 font-semibold">{formatTimeAgo(m.createdAt)}</span>
+                                            </div>
+                                            <p className="text-[11px] text-slate-500 truncate">{m.message || 'Customer inquiry submitted'}</p>
+                                        </div>
                                     </div>
+                                ))
+                            ) : (
+                                <div className="p-8 text-center text-xs text-slate-400 font-bold">
+                                    No new customer messages
                                 </div>
-                            ))}
+                            )}
                         </div>
                     </div>
                 </div>
             </div>
 
             {/* Footer */}
-            <p className="text-center text-[11px] text-slate-400 pt-2">© 2024 ⊕ Digital Cyber Cafe</p>
+            <p className="text-center text-[11px] text-slate-400 pt-2">© 2026 Digital Cyber Cafe Mangolpuri • Real-Time Database Synchronized</p>
         </div>
     );
 };

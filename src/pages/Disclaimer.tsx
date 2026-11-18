@@ -1,8 +1,18 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertCircle, ArrowLeft, Building2, CheckCircle2, ShieldCheck, Scale } from 'lucide-react';
+import api from '../api/axios';
 
 export const Disclaimer: React.FC = () => {
+    const [customDisclaimer, setCustomDisclaimer] = useState<string>('');
+
+    useEffect(() => {
+        api.get('/settings').then(res => {
+            if (res.data?.success && res.data.data?.disclaimer) {
+                setCustomDisclaimer(res.data.data.disclaimer);
+            }
+        }).catch(() => {});
+    }, []);
     return (
         <div className="min-h-screen py-10 px-4 md:px-8 transition-colors duration-500" style={{ backgroundColor: 'var(--app-bg)' }}>
             <div className="max-w-4xl mx-auto">
@@ -32,6 +42,17 @@ export const Disclaimer: React.FC = () => {
 
                 {/* Content Cards */}
                 <div className="space-y-6 text-slate-700 dark:text-slate-300">
+                    {customDisclaimer && (
+                        <section className="bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-500/20 rounded-2xl p-6 md:p-8 shadow-sm space-y-3">
+                            <div className="flex items-center gap-2.5 text-amber-900 dark:text-amber-300 font-black text-lg">
+                                <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                                <h2>Important Disclaimer Notice from Management</h2>
+                            </div>
+                            <div className="text-sm leading-relaxed text-slate-700 dark:text-slate-300 whitespace-pre-line font-medium">
+                                {customDisclaimer}
+                            </div>
+                        </section>
+                    )}
                     <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl p-6 md:p-8 shadow-sm space-y-4">
                         <div className="flex items-center gap-2.5 text-slate-900 dark:text-white font-black text-lg">
                             <Building2 className="w-5 h-5 text-blue-600" />

@@ -1,8 +1,18 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ShieldCheck, ArrowLeft, Lock, Eye, FileText, CheckCircle2 } from 'lucide-react';
+import api from '../api/axios';
 
 export const PrivacyPolicy: React.FC = () => {
+    const [customPolicy, setCustomPolicy] = useState<string>('');
+
+    useEffect(() => {
+        api.get('/settings').then(res => {
+            if (res.data?.success && res.data.data?.privacyPolicy) {
+                setCustomPolicy(res.data.data.privacyPolicy);
+            }
+        }).catch(() => {});
+    }, []);
     return (
         <div className="min-h-screen py-10 px-4 md:px-8 transition-colors duration-500" style={{ backgroundColor: 'var(--app-bg)' }}>
             <div className="max-w-4xl mx-auto">
@@ -32,6 +42,17 @@ export const PrivacyPolicy: React.FC = () => {
 
                 {/* Content Cards */}
                 <div className="space-y-6 text-slate-700 dark:text-slate-300">
+                    {customPolicy && (
+                        <section className="bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-500/20 rounded-2xl p-6 md:p-8 shadow-sm space-y-3">
+                            <div className="flex items-center gap-2.5 text-blue-900 dark:text-blue-300 font-black text-lg">
+                                <ShieldCheck className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                                <h2>Official Privacy Notice from Administrator</h2>
+                            </div>
+                            <div className="text-sm leading-relaxed text-slate-700 dark:text-slate-300 whitespace-pre-line font-medium">
+                                {customPolicy}
+                            </div>
+                        </section>
+                    )}
                     <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl p-6 md:p-8 shadow-sm space-y-4">
                         <div className="flex items-center gap-2.5 text-slate-900 dark:text-white font-black text-lg">
                             <Lock className="w-5 h-5 text-blue-600" />

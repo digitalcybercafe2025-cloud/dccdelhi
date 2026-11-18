@@ -33,6 +33,7 @@ const applicationSchema = new mongoose.Schema({
     docType: String,
     fileName: String,
     filePath: String,
+    fileData: String,
     originalName: String,
     mimeType: String,
     fileSize: Number

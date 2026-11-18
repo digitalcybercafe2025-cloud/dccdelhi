@@ -193,12 +193,16 @@ const LiveNoticesManager: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
+    const payload = { ...formData };
+    if (payload.actionUrl?.trim() && !payload.actionText?.trim()) {
+      payload.actionText = 'Apply Now';
+    }
     try {
       if (selectedFile) {
         const data = new FormData();
-        Object.keys(formData).forEach((key) => {
-          if (formData[key] !== undefined && formData[key] !== null) {
-            data.append(key, formData[key]);
+        Object.keys(payload).forEach((key) => {
+          if (payload[key] !== undefined && payload[key] !== null) {
+            data.append(key, payload[key]);
           }
         });
         data.append('iconImage', selectedFile);
@@ -213,10 +217,10 @@ const LiveNoticesManager: React.FC = () => {
       } else {
         // Send as clean JSON when no file upload
         if (editingNotice) {
-          await api.put(`/hero/notices/${editingNotice._id}`, formData);
+          await api.put(`/hero/notices/${editingNotice._id}`, payload);
           showSuccess('Notice updated successfully!');
         } else {
-          await api.post('/hero/notices', formData);
+          await api.post('/hero/notices', payload);
           showSuccess('New notice broadcasted live!');
         }
       }
@@ -554,6 +558,14 @@ const LiveNoticesManager: React.FC = () => {
                           <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mt-1 leading-relaxed">
                             {notice.description}
                           </p>
+
+                          {notice.actionUrl && (
+                            <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-lg text-[10px] font-bold">
+                                <ExternalLink size={11} /> {notice.actionText || 'Apply Now'}: <span className="underline truncate max-w-[180px]">{notice.actionUrl}</span>
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1211,8 +1223,11 @@ const LiveNoticesManager: React.FC = () => {
               {/* Action Button & URL */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                    Action Button Label (Optional)
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center justify-between">
+                    <span>Action Button Label (Optional)</span>
+                    {formData.actionUrl && !formData.actionText && (
+                      <span className="text-[9px] text-blue-500 font-bold lowercase">(defaults to: "apply now")</span>
+                    )}
                   </label>
                   <input
                     value={formData.actionText}

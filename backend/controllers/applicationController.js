@@ -124,14 +124,26 @@ const createApplication = async (req, res) => {
         let documents = [];
         const parsedDocTypes = safeJsonParse(req.body.documentTypes) || [];
         if (documentFiles.length > 0) {
-            documents = documentFiles.map((file, idx) => ({
-                docType: parsedDocTypes[idx] || file.fieldname,
-                fileName: file.filename,
-                filePath: `uploads/${file.filename}`,
-                originalName: file.originalname,
-                mimeType: file.mimetype,
-                fileSize: file.size
-            }));
+            documents = documentFiles.map((file, idx) => {
+                let fileData = null;
+                if (file.path && fs.existsSync(file.path)) {
+                    try {
+                        const buffer = fs.readFileSync(file.path);
+                        fileData = `data:${file.mimetype};base64,${buffer.toString('base64')}`;
+                    } catch (e) {
+                        console.error('File buffer conversion error:', e);
+                    }
+                }
+                return {
+                    docType: parsedDocTypes[idx] || file.fieldname,
+                    fileName: file.filename,
+                    filePath: fileData || `uploads/${file.filename}`,
+                    fileData: fileData,
+                    originalName: file.originalname,
+                    mimeType: file.mimetype,
+                    fileSize: file.size
+                };
+            });
         }
 
         const application = await Application.create({
@@ -313,16 +325,28 @@ const updateApplicationStatus = async (req, res) => {
 // @access  Private/Admin
 const downloadDocument = async (req, res) => {
     try {
-        const application = await Application.findById(req.params.id);
+        let application;
+        if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+            application = await Application.findById(req.params.id);
+        }
+        if (!application) {
+            application = await Application.findOne({ trackingId: req.params.id });
+        }
         if (!application) return res.status(404).json({ success: false, message: 'Application not found' });
 
         const docIndex = parseInt(req.params.docIndex, 10);
         const doc = application.documents && application.documents[docIndex];
         if (!doc) return res.status(404).json({ success: false, message: 'Document not found' });
 
-        // If doc.filePath is a data URL (base64)
-        if (doc.filePath && doc.filePath.startsWith('data:')) {
-            const matches = doc.filePath.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+        // If doc.fileData or doc.filePath is a data URL (base64)
+        const dataUri = (doc.fileData && doc.fileData.startsWith('data:'))
+            ? doc.fileData
+            : (doc.filePath && doc.filePath.startsWith('data:'))
+                ? doc.filePath
+                : null;
+
+        if (dataUri) {
+            const matches = dataUri.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
             if (matches && matches.length === 3) {
                 const mimeType = matches[1];
                 const buffer = Buffer.from(matches[2], 'base64');
@@ -352,7 +376,7 @@ const downloadDocument = async (req, res) => {
         let filePath = candidatePaths.find(p => fs.existsSync(p));
 
         if (!filePath || !fs.existsSync(filePath)) {
-            return res.status(404).json({ success: false, message: 'File not found on server' });
+            return res.status(404).json({ success: false, message: 'Document file not found on server' });
         }
 
         const downloadName = `${doc.docType || 'document'}-${doc.originalName || doc.fileName || baseName}`;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit3, Image as ImageIcon, Save, X, MoveUp, MoveDown, Check, AlertCircle, Loader2, Link as LinkIcon, Upload, Sparkles } from 'lucide-react';
+import { Plus, Trash2, Edit3, Image as ImageIcon, Save, X, MoveUp, MoveDown, Check, AlertCircle, Loader2, Link as LinkIcon, Upload, Sparkles, LayoutGrid, List, Settings as SettingsIcon } from 'lucide-react';
 import api, { getMediaUrl } from '../../api/axios';
 
 interface Slide {
@@ -32,7 +32,17 @@ const formatExternalImageUrl = (url: string): string => {
 };
 
 const HeroCarouselManager: React.FC<Props> = ({ viewMode = 'grid' }) => {
+    const [view, setView] = useState<'grid' | 'list'>(viewMode || 'grid');
     const [slides, setSlides] = useState<Slide[]>([]);
+    const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+    const [settingsSaving, setSettingsSaving] = useState(false);
+    const [carouselSettings, setCarouselSettings] = useState({
+        heroAutoplay: true,
+        heroInterval: 5,
+        heroShowIndicators: true,
+        heroShowArrows: true,
+        heroTransition: 'fade'
+    });
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingSlide, setEditingSlide] = useState<Slide | null>(null);
@@ -54,8 +64,50 @@ const HeroCarouselManager: React.FC<Props> = ({ viewMode = 'grid' }) => {
     const [success, setSuccess] = useState<string | null>(null);
 
     useEffect(() => {
+        if (viewMode) setView(viewMode);
+    }, [viewMode]);
+
+    useEffect(() => {
         fetchSlides();
+        fetchCarouselSettings();
     }, []);
+
+    const fetchCarouselSettings = async () => {
+        try {
+            const res = await api.get('/settings');
+            if (res.data?.success && res.data.data) {
+                const d = res.data.data;
+                setCarouselSettings({
+                    heroAutoplay: d.heroAutoplay !== undefined ? Boolean(d.heroAutoplay) : true,
+                    heroInterval: Number(d.heroInterval) || 5,
+                    heroShowIndicators: d.heroShowIndicators !== undefined ? Boolean(d.heroShowIndicators) : true,
+                    heroShowArrows: d.heroShowArrows !== undefined ? Boolean(d.heroShowArrows) : true,
+                    heroTransition: d.heroTransition || 'fade'
+                });
+            }
+        } catch (err: any) {
+            console.error('Fetch carousel settings error:', err);
+        }
+    };
+
+    const handleSaveCarouselSettings = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setSettingsSaving(true);
+        setError(null);
+        try {
+            const res = await api.put('/settings', carouselSettings);
+            if (res.data?.success) {
+                setSuccess('Hero Carousel settings saved successfully!');
+                setIsSettingsModalOpen(false);
+                setTimeout(() => setSuccess(null), 3500);
+            }
+        } catch (err: any) {
+            console.error('Save carousel settings error:', err);
+            setError(err.response?.data?.message || 'Failed to save carousel settings');
+        } finally {
+            setSettingsSaving(false);
+        }
+    };
 
     const fetchSlides = async () => {
         try {
@@ -234,18 +286,61 @@ const HeroCarouselManager: React.FC<Props> = ({ viewMode = 'grid' }) => {
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
                     <h2 className="text-2xl font-black text-slate-800 tracking-tight">Hero Carousel Manager</h2>
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Full control over landing page visuals</p>
                 </div>
-                <button
-                    onClick={() => { resetForm(); setIsModalOpen(true); }}
-                    className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-2xl font-black text-xs hover:bg-blue-700 transition-all shadow-lg hover:scale-105 active:scale-95"
-                >
-                    <Plus className="w-4 h-4" /> ADD NEW SLIDE
-                </button>
+                <div className="flex items-center gap-2.5">
+                    {/* View Mode Toggle: Grid / List */}
+                    <div className="flex items-center bg-slate-100 p-1 rounded-2xl border border-slate-200">
+                        <button
+                            type="button"
+                            onClick={() => setView('grid')}
+                            className={`p-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${view === 'grid' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                            title="Grid View"
+                        >
+                            <LayoutGrid className="w-4 h-4" />
+                            <span className="hidden md:inline">Grid</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setView('list')}
+                            className={`p-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${view === 'list' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                            title="List View"
+                        >
+                            <List className="w-4 h-4" />
+                            <span className="hidden md:inline">List</span>
+                        </button>
+                    </div>
+
+                    {/* Carousel Settings Button */}
+                    <button
+                        type="button"
+                        onClick={() => { fetchCarouselSettings(); setIsSettingsModalOpen(true); }}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-2xl font-bold text-xs hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm active:scale-95"
+                        title="Carousel Settings"
+                    >
+                        <SettingsIcon className="w-4 h-4 text-slate-500" />
+                        <span className="hidden sm:inline">Settings</span>
+                    </button>
+
+                    {/* Add New Slide Button */}
+                    <button
+                        onClick={() => { resetForm(); setIsModalOpen(true); }}
+                        className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-2xl font-black text-xs hover:bg-blue-700 transition-all shadow-lg hover:scale-105 active:scale-95"
+                    >
+                        <Plus className="w-4 h-4" /> ADD NEW SLIDE
+                    </button>
+                </div>
             </div>
+
+            {success && (
+                <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center gap-3 text-emerald-700 font-bold animate-in slide-in-from-top-4">
+                    <Check size={20} className="text-emerald-600 shrink-0" />
+                    <p className="text-sm">{success}</p>
+                </div>
+            )}
 
             {error && !isModalOpen && (
                 <div className="p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3 text-red-600 font-bold animate-in slide-in-from-top-4">
@@ -256,7 +351,7 @@ const HeroCarouselManager: React.FC<Props> = ({ viewMode = 'grid' }) => {
 
             {loading ? (
                 <div className="flex justify-center py-20"><Loader2 className="w-10 h-10 animate-spin text-blue-600" /></div>
-            ) : viewMode === 'grid' ? (
+            ) : view === 'grid' ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {slides.map((slide) => (
                         <div key={slide._id} className="bg-white rounded-[2rem] p-5 shadow-sm border border-slate-100 group hover:shadow-xl transition-all">
@@ -501,6 +596,132 @@ const HeroCarouselManager: React.FC<Props> = ({ viewMode = 'grid' }) => {
                                 >
                                     {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save size={16} />}
                                     {editingSlide ? 'UPDATE SLIDE DATA' : 'PUBLISH NEW SLIDE'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* CAROUSEL PLAYBACK & DISPLAY SETTINGS MODAL */}
+            {isSettingsModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="bg-white rounded-[2.5rem] w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+                        <div className="px-8 py-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2.5 bg-blue-50 text-blue-600 rounded-2xl">
+                                    <SettingsIcon className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-black text-slate-800">Carousel Settings</h3>
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">Landing Page Slider Controls</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setIsSettingsModalOpen(false)}
+                                className="p-2 hover:bg-slate-200/50 rounded-xl text-slate-400 hover:text-slate-600 transition-colors"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleSaveCarouselSettings} className="p-8 space-y-6">
+                            {/* Autoplay Toggle */}
+                            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                                <div>
+                                    <h4 className="text-xs font-black text-slate-800">Auto Slide (Autoplay)</h4>
+                                    <p className="text-[10px] text-slate-400 font-bold mt-0.5">Automatically cycle through slides</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setCarouselSettings(prev => ({ ...prev, heroAutoplay: !prev.heroAutoplay }))}
+                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${carouselSettings.heroAutoplay ? 'bg-blue-600' : 'bg-slate-300'}`}
+                                >
+                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${carouselSettings.heroAutoplay ? 'translate-x-6' : 'translate-x-1'}`} />
+                                </button>
+                            </div>
+
+                            {/* Interval Selector */}
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block ml-1">
+                                    Slide Duration (Interval)
+                                </label>
+                                <div className="grid grid-cols-4 gap-2">
+                                    {[3, 5, 7, 10].map((sec) => (
+                                        <button
+                                            key={sec}
+                                            type="button"
+                                            onClick={() => setCarouselSettings(prev => ({ ...prev, heroInterval: sec }))}
+                                            className={`py-3 rounded-2xl border text-xs font-black transition-all ${carouselSettings.heroInterval === sec ? 'bg-blue-50 border-blue-200 text-blue-600 shadow-sm' : 'bg-slate-50 border-slate-100 text-slate-600 hover:bg-white'}`}
+                                        >
+                                            {sec}s {sec === 5 && '(Std)'}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Indicators & Arrows Toggles */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div className="flex items-center justify-between p-3.5 bg-slate-50 rounded-2xl border border-slate-100">
+                                    <div>
+                                        <h4 className="text-[11px] font-black text-slate-800">Bottom Dots</h4>
+                                        <p className="text-[9px] text-slate-400 font-bold">Slide indicators</p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setCarouselSettings(prev => ({ ...prev, heroShowIndicators: !prev.heroShowIndicators }))}
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${carouselSettings.heroShowIndicators ? 'bg-blue-600' : 'bg-slate-300'}`}
+                                    >
+                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${carouselSettings.heroShowIndicators ? 'translate-x-4' : 'translate-x-1'}`} />
+                                    </button>
+                                </div>
+
+                                <div className="flex items-center justify-between p-3.5 bg-slate-50 rounded-2xl border border-slate-100">
+                                    <div>
+                                        <h4 className="text-[11px] font-black text-slate-800">Arrow Chevrons</h4>
+                                        <p className="text-[9px] text-slate-400 font-bold">Prev / Next arrows</p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setCarouselSettings(prev => ({ ...prev, heroShowArrows: !prev.heroShowArrows }))}
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${carouselSettings.heroShowArrows ? 'bg-blue-600' : 'bg-slate-300'}`}
+                                    >
+                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${carouselSettings.heroShowArrows ? 'translate-x-4' : 'translate-x-1'}`} />
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Transition Style */}
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block ml-1">
+                                    Transition Effect
+                                </label>
+                                <select
+                                    value={carouselSettings.heroTransition}
+                                    onChange={(e) => setCarouselSettings(prev => ({ ...prev, heroTransition: e.target.value }))}
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-700 outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-400 transition-all"
+                                >
+                                    <option value="fade">Smooth Fade (Recommended)</option>
+                                    <option value="zoom">Scale & Zoom Fade</option>
+                                    <option value="slide">Horizontal Slide</option>
+                                </select>
+                            </div>
+
+                            <div className="pt-4 border-t border-slate-100 flex items-center gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsSettingsModalOpen(false)}
+                                    className="w-1/3 py-3 rounded-2xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    disabled={settingsSaving}
+                                    type="submit"
+                                    className="w-2/3 py-3 bg-blue-600 text-white rounded-2xl font-black text-xs hover:bg-blue-700 transition-all shadow-lg hover:shadow-blue-500/20 active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                                >
+                                    {settingsSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save size={15} />}
+                                    Save Carousel Settings
                                 </button>
                             </div>
                         </form>

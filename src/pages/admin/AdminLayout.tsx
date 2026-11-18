@@ -84,6 +84,7 @@ const AdminLayout: React.FC = () => {
     const token = localStorage.getItem('mangolpuri_admin_token');
     const adminRole = localStorage.getItem('mangolpuri_admin_role') || 'Admin';
     const adminEmail = localStorage.getItem('mangolpuri_admin_email') || 'admin@dcc.in';
+    const adminMobile = localStorage.getItem('mangolpuri_admin_phone') || localStorage.getItem('mangolpuri_admin_mobile') || '9911423881';
     const [adminAvatar, setAdminAvatar] = useState<string | null>(() => localStorage.getItem('mangolpuri_admin_avatar'));
     const adminName = adminEmail.split('@')[0].charAt(0).toUpperCase() + adminEmail.split('@')[0].slice(1);
 
@@ -179,77 +180,85 @@ const AdminLayout: React.FC = () => {
 
             {/* Main */}
             <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${sidebarCollapsed ? 'md:ml-16' : 'md:ml-44'}`}>
-                {/* ── TOP NAVBAR (matches screenshot) ── */}
-                <header className="bg-white border-b border-slate-100 px-6 py-3.5 flex items-center justify-between flex-shrink-0 shadow-sm">
-                    {/* Left: Mobile burger + Logo Text */}
+                {/* ── TOP NAVBAR (matches screenshot exactly) ── */}
+                <header className="bg-white border border-slate-200/80 rounded-2xl mx-4 mt-3 mb-2 px-4 py-2 flex items-center justify-between flex-shrink-0 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.06)] transition-all">
+                    {/* Left: Mobile toggle (on mobile only) + Digital Cyber Cafe branding */}
                     <div className="flex items-center gap-3">
-                        <button className="md:hidden p-1.5 rounded-lg hover:bg-slate-100" onClick={() => setMobileOpen(!mobileOpen)}>
-                            <Icon d="M4 6h16M4 12h16M4 18h16" size={20} className="text-slate-600" />
+                        <button
+                            className="md:hidden p-1.5 rounded-lg hover:bg-slate-100 text-slate-600"
+                            onClick={() => setMobileOpen(!mobileOpen)}
+                            title="Toggle Menu"
+                        >
+                            <LayoutGrid size={18} />
                         </button>
-                        {/* Logo + Name */}
-                        <div className="flex items-center gap-2">
-                            <div className="flex items-baseline gap-2">
-                                <span className="font-black text-slate-800 text-base leading-none hidden sm:block">Digital Cyber Cafe</span>
-                                <span className="text-xs text-slate-400 font-semibold hidden sm:block">
-                                    Admin | <span className="text-blue-600 font-bold capitalize">{adminName}</span>
-                                </span>
-                            </div>
+
+                        <div className="flex items-baseline gap-2">
+                            <span className="font-extrabold text-slate-800 text-sm sm:text-base leading-none">
+                                Digital Cyber Cafe
+                            </span>
+                            <span className="text-xs text-slate-400 font-semibold hidden sm:inline-flex items-center gap-1">
+                                Admin | <span className="text-blue-600 font-bold">{adminMobile}</span>
+                            </span>
                         </div>
                     </div>
 
-                    {/* Right: Icons + Admin + Logout */}
+                    {/* Right: Theme Toggle + Bell + Divider + Avatar (NO listview button!) */}
                     <div className="flex items-center gap-2">
                         {/* Theme Toggle */}
                         <button
                             onClick={() => setAdminDarkMode(!adminDarkMode)}
-                            className="w-9 h-9 rounded-lg flex items-center justify-center hover:bg-slate-100 text-slate-400 transition-all active:scale-90"
+                            className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-slate-100 text-slate-600 transition-all active:scale-90"
+                            title={adminDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
                         >
                             {adminDarkMode ? <Sun className="w-5 h-5 text-amber-500" /> : <Moon className="w-5 h-5" />}
                         </button>
-                        {/* Messages icon replaced by Grid/List view toggle */}
-                        <button
-                            onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
-                            className="w-9 h-9 rounded-lg flex items-center justify-center hover:bg-slate-100 text-slate-400 transition-colors"
-                            title={viewMode === 'grid' ? "Switch to List View" : "Switch to Grid View"}
-                        >
-                            {viewMode === 'grid' ? <List className="w-[17px] h-[17px]" /> : <LayoutGrid className="w-[17px] h-[17px]" />}
-                        </button>
-                        {/* Notification bell */}
+
+                        {/* Notification Bell */}
                         <button
                             onClick={() => navigate('/admin/notifications')}
-                            className="w-9 h-9 rounded-lg flex items-center justify-center hover:bg-slate-100 text-slate-400 relative transition-colors"
+                            className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-slate-100 text-slate-600 relative transition-all active:scale-90"
+                            title="Notifications"
                         >
-                            <Bell className="w-[17px] h-[17px]" />
-                            {unreadCount > 0 && (
+                            <Bell className="w-5 h-5" />
+                            {unreadCount > 0 ? (
                                 <span className="absolute top-1.5 right-1.5 min-w-[14px] h-[14px] px-1 bg-red-500 rounded-full border border-white text-[8px] font-black text-white flex items-center justify-center leading-none">
                                     {unreadCount}
                                 </span>
+                            ) : (
+                                <span className="absolute top-1.5 right-2 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white" />
                             )}
                         </button>
 
                         {/* Divider */}
-                        <div className="w-px h-6 bg-slate-200 mx-1" />
+                        <div className="w-[1.5px] h-5 bg-slate-200 mx-1" />
 
-                        {/* Admin Avatar Dropdown */}
+                        {/* Admin Avatar Dropdown with 4-color glowing ring */}
                         <div className="relative">
                             <button
                                 onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
                                 onBlur={() => setTimeout(() => setProfileDropdownOpen(false), 200)}
-                                className="flex items-center gap-2 hover:bg-slate-50 p-1 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-100"
+                                className="flex items-center p-0.5 rounded-full transition-all focus:outline-none"
                             >
-                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white text-xs font-black overflow-hidden shadow-inner ring-2 ring-white">
-                                    {adminAvatar ? (
-                                        <img
-                                            src={getMediaUrl(adminAvatar)}
-                                            alt="Avatar"
-                                            className="w-full h-full object-cover"
-                                            onError={(e) => {
-                                                (e.currentTarget as HTMLElement).style.display = 'none';
-                                            }}
-                                        />
-                                    ) : (
-                                        adminName.slice(0, 2).toUpperCase()
-                                    )}
+                                <div
+                                    className="p-[2px] rounded-full transition-all duration-300 hover:shadow-[0_0_12px_rgba(37,99,235,0.45)] hover:scale-105"
+                                    style={{
+                                        background: 'conic-gradient(from 45deg, #2563eb 0deg, #10b981 90deg, #f97316 180deg, #ef4444 270deg, #2563eb 360deg)'
+                                    }}
+                                >
+                                    <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-700 text-xs font-black overflow-hidden ring-1 ring-white">
+                                        {adminAvatar ? (
+                                            <img
+                                                src={getMediaUrl(adminAvatar)}
+                                                alt="Avatar"
+                                                className="w-full h-full object-cover"
+                                                onError={(e) => {
+                                                    (e.currentTarget as HTMLElement).style.display = 'none';
+                                                }}
+                                            />
+                                        ) : (
+                                            <User size={16} className="text-slate-500" />
+                                        )}
+                                    </div>
                                 </div>
                             </button>
 

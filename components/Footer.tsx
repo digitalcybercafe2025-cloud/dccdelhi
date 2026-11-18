@@ -185,6 +185,14 @@ export const Footer: React.FC<FooterProps> = ({ onSecretAdminAuth }) => {
     const [docsSearch, setDocsSearch] = useState('');
     const [chargesSearch, setChargesSearch] = useState('');
 
+    const getDynamicStartingFee = (key: string) => {
+        if (key === 'app' && (settings as any).appStartingFee) return (settings as any).appStartingFee;
+        if (key === 'web' && (settings as any).webStartingFee) return (settings as any).webStartingFee;
+        if (key === 'design' && (settings as any).designStartingFee) return (settings as any).designStartingFee;
+        if (key === 'tech' && (settings as any).techStartingFee) return (settings as any).techStartingFee;
+        return DIGITAL_SOLUTIONS_DATA[key]?.startingFee || 'Starting fee available on request';
+    };
+
     useEffect(() => {
         let isMounted = true;
 
@@ -742,7 +750,7 @@ export const Footer: React.FC<FooterProps> = ({ onSecretAdminAuth }) => {
                             </div>
                             <div>
                                 <span className="text-[9px] uppercase tracking-wider text-slate-400 block font-black">Starting Price</span>
-                                <span className="text-blue-600 dark:text-blue-400">{DIGITAL_SOLUTIONS_DATA[activeSolutionKey].startingFee}</span>
+                                <span className="text-blue-600 dark:text-blue-400">{getDynamicStartingFee(activeSolutionKey)}</span>
                             </div>
                         </div>
 

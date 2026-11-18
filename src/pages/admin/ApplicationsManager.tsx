@@ -51,6 +51,7 @@ const ApplicationsManager: React.FC = () => {
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [previewMimeType, setPreviewMimeType] = useState<string>('');
     const [previewLoading, setPreviewLoading] = useState(false);
+    const [previewError, setPreviewError] = useState<string | null>(null);
 
     // Auto-open requested application if trackingId or id is in query params
     useEffect(() => {
@@ -187,38 +188,54 @@ const ApplicationsManager: React.FC = () => {
         setPreviewLoading(true);
         setPreviewUrl(null);
         setPreviewMimeType('');
+        setPreviewError(null);
         const doc = selected?.documents?.[docIndex];
-        const directUrl = doc?.filePath ? getMediaUrl(doc.filePath) : '';
-        const detectedMime = inferMimeType(doc, '');
+
+        // 1. If document already contains base64 data URL
+        if (doc?.filePath && doc.filePath.startsWith('data:')) {
+            const mimeType = inferMimeType(doc, '');
+            setPreviewMimeType(mimeType);
+            setPreviewUrl(doc.filePath);
+            setPreviewLoading(false);
+            return;
+        }
 
         try {
             const response = await api.get(`/applications/${appId}/documents/${docIndex}/download`, {
                 responseType: 'blob'
             });
-            const mimeType = inferMimeType(doc, response.headers?.['content-type']);
+            const contentType = response.headers?.['content-type'] || '';
+            // If the server returned JSON error instead of blob
+            if (contentType.includes('application/json')) {
+                const text = await (response.data as Blob).text();
+                try {
+                    const parsed = JSON.parse(text);
+                    if (!parsed.success) {
+                        setPreviewError(parsed.message || 'Document file is unavailable on server.');
+                        setPreviewLoading(false);
+                        return;
+                    }
+                } catch {}
+            }
+            const mimeType = inferMimeType(doc, contentType);
             const blob = new Blob([response.data], { type: mimeType });
             const url = window.URL.createObjectURL(blob);
             setPreviewMimeType(mimeType);
             setPreviewUrl(url);
-        } catch {
-            // Fallback: If blob endpoint failed, load direct media URL
-            if (directUrl) {
-                setPreviewMimeType(detectedMime);
-                setPreviewUrl(directUrl);
-            } else {
-                alert('Document preview failed. File may not exist on server.');
-                setPreviewDocIndex(null);
-            }
+        } catch (err: any) {
+            console.error('Document preview error:', err);
+            setPreviewError('This document file is no longer available on the server (it may have been removed during server maintenance or was a previous test upload).');
         } finally {
             setPreviewLoading(false);
         }
     };
 
     const closePreview = () => {
-        if (previewUrl) window.URL.revokeObjectURL(previewUrl);
+        if (previewUrl && previewUrl.startsWith('blob:')) window.URL.revokeObjectURL(previewUrl);
         setPreviewUrl(null);
         setPreviewMimeType('');
         setPreviewDocIndex(null);
+        setPreviewError(null);
     };
 
     const downloadFromPreview = () => {
@@ -655,7 +672,7 @@ const ApplicationsManager: React.FC = () => {
             )}
 
             {/* ── Document Preview Modal ── */}
-            {(previewUrl || previewLoading) && (
+            {(previewUrl || previewLoading || previewError) && (
                 <div
                     className="fixed inset-0 z-[300] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
                     onClick={closePreview}
@@ -669,13 +686,15 @@ const ApplicationsManager: React.FC = () => {
                                 {selected?.documents?.[previewDocIndex || 0] ? getCleanDocName(selected.documents[previewDocIndex || 0], previewDocIndex || 0) : 'Document'} Preview
                             </span>
                             <div className="flex items-center gap-2">
-                                <button
-                                    onClick={downloadFromPreview}
-                                    className="p-1.5 bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white rounded-lg transition-colors"
-                                    title="Download"
-                                >
-                                    <Download size={16} />
-                                </button>
+                                {previewUrl && !previewError && (
+                                    <button
+                                        onClick={downloadFromPreview}
+                                        className="p-1.5 bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white rounded-lg transition-colors"
+                                        title="Download"
+                                    >
+                                        <Download size={16} />
+                                    </button>
+                                )}
                                 <button
                                     onClick={closePreview}
                                     className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600"
@@ -684,9 +703,28 @@ const ApplicationsManager: React.FC = () => {
                                 </button>
                             </div>
                         </div>
-                        <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-slate-900/5">
+                        <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-slate-900/5 min-h-[280px]">
                             {previewLoading ? (
-                                <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+                                <div className="flex flex-col items-center gap-2">
+                                    <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+                                    <span className="text-xs font-bold text-slate-400">Loading document preview...</span>
+                                </div>
+                            ) : previewError ? (
+                                <div className="p-8 text-center max-w-md mx-auto space-y-3">
+                                    <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 mx-auto flex items-center justify-center shadow-sm">
+                                        <AlertTriangle className="w-6 h-6" />
+                                    </div>
+                                    <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight">Document File Unavailable</h4>
+                                    <p className="text-xs font-medium text-slate-500 leading-relaxed">
+                                        {previewError}
+                                    </p>
+                                    <button
+                                        onClick={closePreview}
+                                        className="mt-2 px-5 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-xs font-black text-slate-700 transition-colors"
+                                    >
+                                        Close Preview
+                                    </button>
+                                </div>
                             ) : previewMimeType.startsWith('image/') && previewUrl ? (
                                 <img
                                     src={previewUrl}

@@ -16,6 +16,26 @@ const settingsSchema = new mongoose.Schema({
     googleMapsUrl: { type: String, default: 'https://maps.google.com/?q=Digital+Cyber+Cafe+Mangolpuri+Delhi' },
     upiId: { type: String, default: '8445221632@upi' },
     upiPayeeName: { type: String, default: 'Digital Cyber Cafe' },
+    // Digital Solutions & Service Costs
+    appStartingFee: { type: String, default: '₹4,999/- onwards' },
+    webStartingFee: { type: String, default: '₹2,999/- onwards' },
+    designStartingFee: { type: String, default: '₹499/- onwards' },
+    techStartingFee: { type: String, default: '₹150/- onwards' },
+    // Legal & Policy Content
+    privacyPolicy: { type: String, default: '' },
+    termsAndConditions: { type: String, default: '' },
+    disclaimer: { type: String, default: '' },
+    // Hero Carousel Settings
+    heroAutoplay: { type: Boolean, default: true },
+    heroInterval: { type: Number, default: 5 },
+    heroShowIndicators: { type: Boolean, default: true },
+    heroShowArrows: { type: Boolean, default: true },
+    heroTransition: { type: String, default: 'fade' },
+    // Testimonials Settings
+    testimonialAutoplay: { type: Boolean, default: true },
+    testimonialInterval: { type: Number, default: 5 },
+    testimonialMinRating: { type: Number, default: 4 },
+    testimonialShowAvatar: { type: Boolean, default: true },
     adminInviteCodeHash: { type: String, select: false }
 }, { timestamps: true });
 

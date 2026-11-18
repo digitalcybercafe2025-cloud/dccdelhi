@@ -1,8 +1,18 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { FileCheck, ArrowLeft, ShieldAlert, Award, RefreshCw, HelpCircle } from 'lucide-react';
+import api from '../api/axios';
 
 export const TermsConditions: React.FC = () => {
+    const [customTerms, setCustomTerms] = useState<string>('');
+
+    useEffect(() => {
+        api.get('/settings').then(res => {
+            if (res.data?.success && res.data.data?.termsAndConditions) {
+                setCustomTerms(res.data.data.termsAndConditions);
+            }
+        }).catch(() => {});
+    }, []);
     return (
         <div className="min-h-screen py-10 px-4 md:px-8 transition-colors duration-500" style={{ backgroundColor: 'var(--app-bg)' }}>
             <div className="max-w-4xl mx-auto">
@@ -32,6 +42,17 @@ export const TermsConditions: React.FC = () => {
 
                 {/* Content Cards */}
                 <div className="space-y-6 text-slate-700 dark:text-slate-300">
+                    {customTerms && (
+                        <section className="bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-500/20 rounded-2xl p-6 md:p-8 shadow-sm space-y-3">
+                            <div className="flex items-center gap-2.5 text-indigo-900 dark:text-indigo-300 font-black text-lg">
+                                <FileCheck className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                                <h2>Official Terms & Policies Notice</h2>
+                            </div>
+                            <div className="text-sm leading-relaxed text-slate-700 dark:text-slate-300 whitespace-pre-line font-medium">
+                                {customTerms}
+                            </div>
+                        </section>
+                    )}
                     <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl p-6 md:p-8 shadow-sm space-y-4">
                         <div className="flex items-center gap-2.5 text-slate-900 dark:text-white font-black text-lg">
                             <Award className="w-5 h-5 text-indigo-600" />

@@ -30,6 +30,9 @@ router.put('/:id', protect, updateApplicationStatus);
 router.delete('/:id', protect, deleteApplication);
 router.delete('/:id/documents/:docIndex', protect, deleteApplicationDocument);
 router.get('/:id/documents/:docIndex/download', protect, downloadDocument);
+router.get('/:id/documents/:docIndex/preview', protect, downloadDocument);
+router.get('/:id/documents/:docIndex/view', protect, downloadDocument);
+router.get('/:id/documents/:docIndex', protect, downloadDocument);
 router.post('/:id/certificate', protect, uploadCertificateMiddleware.single('certificate'), uploadCertificate);
 
 module.exports = router;
