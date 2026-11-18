@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import api from '../../api/axios';
+import { useSearchParams } from 'react-router-dom';
+import api, { getMediaUrl } from '../../api/axios';
 import { SERVICES } from '../../../constants';
 import { Download, Eye, X, Trash2, AlertTriangle, Check, Loader2 } from 'lucide-react';
 
@@ -31,6 +32,7 @@ const getCleanDocName = (doc: any, index: number) => {
 };
 
 const ApplicationsManager: React.FC = () => {
+    const [searchParams] = useSearchParams();
     const [applications, setApplications] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
@@ -49,6 +51,24 @@ const ApplicationsManager: React.FC = () => {
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [previewMimeType, setPreviewMimeType] = useState<string>('');
     const [previewLoading, setPreviewLoading] = useState(false);
+
+    // Auto-open requested application if trackingId or id is in query params
+    useEffect(() => {
+        const trackingId = searchParams.get('trackingId');
+        const appId = searchParams.get('id');
+        if (trackingId) {
+            setSearch(trackingId);
+            setSearchInput(trackingId);
+            api.get(`/applications?search=${encodeURIComponent(trackingId)}&limit=1`).then(res => {
+                const found = res.data?.data?.[0];
+                if (found) setSelected(found);
+            }).catch(console.error);
+        } else if (appId) {
+            api.get(`/applications/${appId}`).then(res => {
+                if (res.data?.data) setSelected(res.data.data);
+            }).catch(console.error);
+        }
+    }, [searchParams]);
 
     // Delete Modal State
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -130,8 +150,9 @@ const ApplicationsManager: React.FC = () => {
 
     const downloadDocument = async (appId: string, docIndex: number, docName: string) => {
         setDownloadingDoc(docIndex);
+        const doc = selected?.documents?.[docIndex];
+        const directUrl = doc?.filePath ? getMediaUrl(doc.filePath) : '';
         try {
-            const doc = selected?.documents?.[docIndex];
             const response = await api.get(`/applications/${appId}/documents/${docIndex}/download`, {
                 responseType: 'blob'
             });
@@ -145,7 +166,17 @@ const ApplicationsManager: React.FC = () => {
             link.remove();
             window.URL.revokeObjectURL(url);
         } catch {
-            alert('Document download failed. File may not exist on server.');
+            if (directUrl) {
+                const link = document.createElement('a');
+                link.href = directUrl;
+                link.setAttribute('download', docName);
+                link.target = '_blank';
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+            } else {
+                alert('Document download failed. File may not exist on server.');
+            }
         } finally {
             setDownloadingDoc(null);
         }
@@ -156,8 +187,11 @@ const ApplicationsManager: React.FC = () => {
         setPreviewLoading(true);
         setPreviewUrl(null);
         setPreviewMimeType('');
+        const doc = selected?.documents?.[docIndex];
+        const directUrl = doc?.filePath ? getMediaUrl(doc.filePath) : '';
+        const detectedMime = inferMimeType(doc, '');
+
         try {
-            const doc = selected?.documents?.[docIndex];
             const response = await api.get(`/applications/${appId}/documents/${docIndex}/download`, {
                 responseType: 'blob'
             });
@@ -167,8 +201,14 @@ const ApplicationsManager: React.FC = () => {
             setPreviewMimeType(mimeType);
             setPreviewUrl(url);
         } catch {
-            alert('Document preview failed. File may not exist on server.');
-            setPreviewDocIndex(null);
+            // Fallback: If blob endpoint failed, load direct media URL
+            if (directUrl) {
+                setPreviewMimeType(detectedMime);
+                setPreviewUrl(directUrl);
+            } else {
+                alert('Document preview failed. File may not exist on server.');
+                setPreviewDocIndex(null);
+            }
         } finally {
             setPreviewLoading(false);
         }

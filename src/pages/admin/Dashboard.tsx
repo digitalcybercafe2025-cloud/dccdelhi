@@ -107,6 +107,8 @@ const Dashboard: React.FC = () => {
     const [stats, setStats] = useState<Stats | null>(null);
     const [loading, setLoading] = useState(true);
     const [statusFilter, setStatusFilter] = useState('All Status');
+    const [dateFilter, setDateFilter] = useState('this_month');
+    const [actionMenuOpenId, setActionMenuOpenId] = useState<string | null>(null);
 
     useEffect(() => {
         api.get('/admin/dashboard')
@@ -132,9 +134,59 @@ const Dashboard: React.FC = () => {
         { name: 'Accepted', value: Math.max(acceptedCount, 1), color: '#10b981' },
     ];
 
-    const filteredApps = statusFilter === 'All Status'
-        ? stats.recent
-        : stats.recent.filter((a: any) => STATUS_LABEL[a.status]?.toLowerCase() === statusFilter.toLowerCase());
+    const now = new Date();
+    const filteredApps = (stats.recent || []).filter((app: any) => {
+        // Status filter
+        if (statusFilter !== 'All Status') {
+            const label = STATUS_LABEL[app.status] || app.status;
+            if (label.toLowerCase() !== statusFilter.toLowerCase()) return false;
+        }
+
+        // Date filter
+        if (dateFilter === 'all') return true;
+        if (!app.createdAt) return true;
+        const appDate = new Date(app.createdAt);
+
+        if (dateFilter === 'this_month') {
+            return appDate.getMonth() === now.getMonth() && appDate.getFullYear() === now.getFullYear();
+        }
+        if (dateFilter === 'today') {
+            return (
+                appDate.getDate() === now.getDate() &&
+                appDate.getMonth() === now.getMonth() &&
+                appDate.getFullYear() === now.getFullYear()
+            );
+        }
+        if (dateFilter === 'this_week') {
+            const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            return appDate >= sevenDaysAgo;
+        }
+        return true;
+    });
+
+    const handleExport = () => {
+        if (!filteredApps.length) {
+            alert('No applications found to export for the selected filter.');
+            return;
+        }
+        const headers = ['Tracking ID', 'Applicant', 'Service', 'Payment', 'Status', 'Date Applied'];
+        const rows = filteredApps.map((a: any) => [
+            `"${a.trackingId || ''}"`,
+            `"${a.userDetails?.fullName || ''}"`,
+            `"${a.serviceName || ''}"`,
+            `"${a.paymentDetails?.paymentStatus || 'Paid'}"`,
+            `"${STATUS_LABEL[a.status] || a.status}"`,
+            `"${new Date(a.createdAt).toLocaleDateString('en-IN')}"`
+        ]);
+        const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement('a');
+        link.setAttribute('href', encodedUri);
+        link.setAttribute('download', `applications_${dateFilter}_${new Date().toISOString().slice(0, 10)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
 
     return (
         <div className="space-y-5">
@@ -184,25 +236,38 @@ const Dashboard: React.FC = () => {
                         <select
                             value={statusFilter}
                             onChange={e => setStatusFilter(e.target.value)}
-                            className="text-xs font-bold border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-600 outline-none"
+                            className="text-xs font-bold border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-600 outline-none hover:border-blue-400 transition-colors cursor-pointer"
                         >
                             {['All Status', 'Pending', 'Process', 'Accepted', 'Rejected'].map(s => (
                                 <option key={s}>{s}</option>
                             ))}
                         </select>
-                        {/* This Month pill */}
-                        <div className="flex items-center gap-1.5 border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-slate-500 bg-white">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
-                            This Month
+                        {/* This Month / Date filter */}
+                        <div className="flex items-center border border-slate-200 rounded-lg bg-white px-2.5 py-1.5 text-xs font-bold text-slate-600 hover:border-blue-400 transition-colors shadow-xs">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1.5 text-slate-500 shrink-0"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
+                            <select
+                                value={dateFilter}
+                                onChange={e => setDateFilter(e.target.value)}
+                                className="bg-transparent outline-none cursor-pointer text-slate-700 font-bold"
+                            >
+                                <option value="this_month">This Month</option>
+                                <option value="all">All Time</option>
+                                <option value="today">Today</option>
+                                <option value="this_week">This Week</option>
+                            </select>
                         </div>
                         {/* Export */}
-                        <button className="flex items-center gap-1.5 border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-slate-500 hover:bg-slate-50 transition-colors">
+                        <button
+                            onClick={handleExport}
+                            title="Export filtered applications"
+                            className="flex items-center gap-1.5 border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-colors active:scale-95"
+                        >
                             Export ₹
                         </button>
                         {/* Add New */}
                         <button
                             onClick={() => window.location.href = '/'}
-                            className="flex items-center gap-1.5 bg-green-500 hover:bg-green-600 text-white rounded-lg px-3 py-2 text-xs font-bold transition-colors"
+                            className="flex items-center gap-1.5 bg-green-500 hover:bg-green-600 text-white rounded-lg px-3 py-2 text-xs font-bold transition-colors active:scale-95"
                         >
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg>
                             Add New
@@ -254,11 +319,79 @@ const Dashboard: React.FC = () => {
                                         <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">
                                             {dateApplied.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
                                         </td>
-                                        <td className="px-4 py-3">
-                                            <button className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md text-[11px] font-bold transition-colors flex items-center gap-1">
-                                                View
-                                                <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" className="opacity-70"><path d="M7 10l5 5 5-5z" /></svg>
-                                            </button>
+                                        <td className="px-4 py-3 relative">
+                                            <div className="relative inline-block text-left">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setActionMenuOpenId(actionMenuOpenId === app._id ? null : app._id)}
+                                                    className="bg-blue-600 hover:bg-blue-700 active:scale-95 text-white px-3 py-1.5 rounded-md text-[11px] font-bold transition-all flex items-center gap-1 shadow-sm"
+                                                    title="View & Actions"
+                                                >
+                                                    View
+                                                    <svg
+                                                        width="10"
+                                                        height="10"
+                                                        viewBox="0 0 24 24"
+                                                        fill="currentColor"
+                                                        className={`opacity-70 transition-transform duration-200 ${actionMenuOpenId === app._id ? 'rotate-180' : ''}`}
+                                                    >
+                                                        <path d="M7 10l5 5 5-5z" />
+                                                    </svg>
+                                                </button>
+
+                                                {actionMenuOpenId === app._id && (
+                                                    <div
+                                                        className="absolute right-0 mt-1.5 w-48 bg-white rounded-xl shadow-xl border border-slate-100 z-50 py-1.5 animate-in fade-in zoom-in-95 duration-150 origin-top-right"
+                                                    >
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setActionMenuOpenId(null);
+                                                                navigate(`/admin/applications?trackingId=${app.trackingId}`);
+                                                            }}
+                                                            className="w-full text-left px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:text-blue-600 transition-colors flex items-center gap-2"
+                                                        >
+                                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-blue-600"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
+                                                            Review Application
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setActionMenuOpenId(null);
+                                                                navigate(`/admin/documents?search=${app.trackingId}`);
+                                                            }}
+                                                            className="w-full text-left px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2"
+                                                        >
+                                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-slate-400"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
+                                                            View Documents
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setActionMenuOpenId(null);
+                                                                window.open(`/track?id=${app.trackingId}`, '_blank');
+                                                            }}
+                                                            className="w-full text-left px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2"
+                                                        >
+                                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-slate-400"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
+                                                            Track Live Status
+                                                        </button>
+                                                        <div className="h-px bg-slate-100 my-1" />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setActionMenuOpenId(null);
+                                                                navigator.clipboard.writeText(app.trackingId);
+                                                                alert(`Tracking ID #${app.trackingId} copied!`);
+                                                            }}
+                                                            className="w-full text-left px-3.5 py-2 text-[11px] font-bold text-slate-500 hover:bg-slate-50 transition-colors flex items-center gap-2"
+                                                        >
+                                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-slate-400"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+                                                            Copy Tracking ID
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 );

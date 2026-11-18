@@ -316,25 +316,47 @@ const downloadDocument = async (req, res) => {
         const application = await Application.findById(req.params.id);
         if (!application) return res.status(404).json({ success: false, message: 'Application not found' });
 
-        const docIndex = parseInt(req.params.docIndex);
-        const doc = application.documents[docIndex];
+        const docIndex = parseInt(req.params.docIndex, 10);
+        const doc = application.documents && application.documents[docIndex];
         if (!doc) return res.status(404).json({ success: false, message: 'Document not found' });
 
-        // Resolve absolute path safely
-        const filePath = path.resolve(doc.filePath);
-        const uploadsDir = path.resolve(path.join(__dirname, '../uploads'));
-
-        // Security: ensure the file is inside the uploads directory
-        if (!filePath.startsWith(uploadsDir)) {
-            return res.status(403).json({ success: false, message: 'Access denied' });
+        // If doc.filePath is a data URL (base64)
+        if (doc.filePath && doc.filePath.startsWith('data:')) {
+            const matches = doc.filePath.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+            if (matches && matches.length === 3) {
+                const mimeType = matches[1];
+                const buffer = Buffer.from(matches[2], 'base64');
+                const downloadName = `${doc.docType || 'document'}-${doc.originalName || doc.fileName || 'file'}`;
+                res.setHeader('Content-Disposition', `inline; filename="${downloadName}"`);
+                res.setHeader('Content-Type', mimeType);
+                return res.send(buffer);
+            }
         }
 
-        if (!fs.existsSync(filePath)) {
+        // Clean relative filename/path
+        const rawPath = String(doc.filePath || doc.fileName || '').trim();
+        const baseName = path.basename(rawPath);
+        const relPath = rawPath.replace(/^[\\/]+/, '').replace(/^uploads[\\/]/, '');
+
+        // Search in all candidate directories (backend/uploads, uploads, etc.)
+        const uploadsDir = path.resolve(path.join(__dirname, '../uploads'));
+        const candidatePaths = [
+            path.join(uploadsDir, baseName),
+            path.join(uploadsDir, relPath),
+            path.resolve(path.join(__dirname, '../../uploads', baseName)),
+            path.resolve(process.cwd(), 'backend', 'uploads', baseName),
+            path.resolve(process.cwd(), 'uploads', baseName),
+            path.resolve(process.cwd(), rawPath)
+        ];
+
+        let filePath = candidatePaths.find(p => fs.existsSync(p));
+
+        if (!filePath || !fs.existsSync(filePath)) {
             return res.status(404).json({ success: false, message: 'File not found on server' });
         }
 
-        const downloadName = `${doc.docType || 'document'}-${doc.originalName || doc.fileName}`;
-        res.setHeader('Content-Disposition', `attachment; filename="${downloadName}"`);
+        const downloadName = `${doc.docType || 'document'}-${doc.originalName || doc.fileName || baseName}`;
+        res.setHeader('Content-Disposition', `inline; filename="${downloadName}"`);
         res.setHeader('Content-Type', doc.mimeType || 'application/octet-stream');
         fs.createReadStream(filePath).pipe(res);
     } catch (error) {

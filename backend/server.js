@@ -44,6 +44,11 @@ app.use('/api/uploads', express.static(path.join(__dirname, 'uploads'), {
     maxAge: '7d',
     etag: true
 }));
+const rootUploads = path.join(__dirname, '../uploads');
+if (fs.existsSync(rootUploads)) {
+    app.use('/uploads', express.static(rootUploads, { maxAge: '7d', etag: true }));
+    app.use('/api/uploads', express.static(rootUploads, { maxAge: '7d', etag: true }));
+}
 
 // Routes
 app.use('/api/applications', require('./routes/applicationRoutes'));
