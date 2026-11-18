@@ -3,6 +3,7 @@ const dotenv = require('dotenv');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const path = require('path');
+const fs = require('fs');
 const rateLimit = require('express-rate-limit');
 
 dotenv.config({ path: path.join(__dirname, '.env') });
