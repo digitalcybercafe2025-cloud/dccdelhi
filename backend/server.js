@@ -29,8 +29,18 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Ensure uploads and avatars directories exist
+const avatarsDir = path.join(__dirname, 'uploads', 'avatars');
+if (!fs.existsSync(avatarsDir)) {
+    fs.mkdirSync(avatarsDir, { recursive: true });
+}
+
 // Serve uploaded files statically with caching
 app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+    maxAge: '7d',
+    etag: true
+}));
+app.use('/api/uploads', express.static(path.join(__dirname, 'uploads'), {
     maxAge: '7d',
     etag: true
 }));

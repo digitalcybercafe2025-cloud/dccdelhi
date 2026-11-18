@@ -49,6 +49,13 @@ router.delete('/users/:id', protect, isAdmin, deleteAdmin);
 // Profile routes
 router.get('/profile', protect, getProfile);
 router.put('/profile', protect, updateProfile);
-router.post('/upload-avatar', protect, avatarUpload.single('avatar'), uploadAvatar);
+router.post('/upload-avatar', protect, (req, res, next) => {
+    avatarUpload.single('avatar')(req, res, (err) => {
+        if (err) {
+            return res.status(400).json({ success: false, message: err.message || 'Avatar upload error' });
+        }
+        next();
+    });
+}, uploadAvatar);
 
 module.exports = router;

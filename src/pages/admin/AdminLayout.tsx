@@ -13,7 +13,7 @@ import HeroCarouselManager from './HeroCarouselManager';
 import LiveNoticesManager from './LiveNoticesManager';
 import AboutMeManager from './AboutMeManager';
 import NotificationsManager from './NotificationsManager';
-import api from '../../api/axios';
+import api, { getMediaUrl } from '../../api/axios';
 
 const NAV_ITEMS = [
     { path: '/admin/dashboard', label: 'Dashboard', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
@@ -84,8 +84,16 @@ const AdminLayout: React.FC = () => {
     const token = localStorage.getItem('mangolpuri_admin_token');
     const adminRole = localStorage.getItem('mangolpuri_admin_role') || 'Admin';
     const adminEmail = localStorage.getItem('mangolpuri_admin_email') || 'admin@dcc.in';
-    const adminAvatar = localStorage.getItem('mangolpuri_admin_avatar');
+    const [adminAvatar, setAdminAvatar] = useState<string | null>(() => localStorage.getItem('mangolpuri_admin_avatar'));
     const adminName = adminEmail.split('@')[0].charAt(0).toUpperCase() + adminEmail.split('@')[0].slice(1);
+
+    useEffect(() => {
+        const handleStorage = () => {
+            setAdminAvatar(localStorage.getItem('mangolpuri_admin_avatar'));
+        };
+        window.addEventListener('storage', handleStorage);
+        return () => window.removeEventListener('storage', handleStorage);
+    }, []);
 
     useEffect(() => {
         if (!token) navigate('/admin', { replace: true });
@@ -231,7 +239,14 @@ const AdminLayout: React.FC = () => {
                             >
                                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white text-xs font-black overflow-hidden shadow-inner ring-2 ring-white">
                                     {adminAvatar ? (
-                                        <img src={adminAvatar.startsWith('/') ? `http://127.0.0.1:5000${adminAvatar}` : adminAvatar} alt="Avatar" className="w-full h-full object-cover" />
+                                        <img
+                                            src={getMediaUrl(adminAvatar)}
+                                            alt="Avatar"
+                                            className="w-full h-full object-cover"
+                                            onError={(e) => {
+                                                (e.currentTarget as HTMLElement).style.display = 'none';
+                                            }}
+                                        />
                                     ) : (
                                         adminName.slice(0, 2).toUpperCase()
                                     )}

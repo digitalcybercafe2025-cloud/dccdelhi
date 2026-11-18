@@ -142,21 +142,31 @@ const AboutMeManager: React.FC = () => {
             <div className="lg:col-span-4 space-y-6">
                 <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden border-b-4 border-b-blue-600/10">
                     <div className="p-8 text-center flex flex-col items-center relative">
-                        <div className="w-48 h-48 rounded-full border-4 border-white shadow-xl overflow-hidden mb-6 relative group bg-slate-100 flex items-center justify-center">
-                            {displayImage ? (
-                                <img
-                                    src={displayImage}
-                                    className="w-full h-full object-cover"
-                                    alt="Profile"
-                                    onError={(e) => {
-                                        (e.currentTarget as HTMLImageElement).src = 'https://img.freepik.com/free-photo/handsome-young-man-with-new-hairstyle-wearing-blue-shirt-feeling-confident-isolated-white-background_176532-8097.jpg';
-                                    }}
-                                />
-                            ) : (
-                                <User className="w-20 h-20 text-slate-300" />
-                            )}
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-                                <ImageIcon className="w-10 h-10 text-white" />
+                        {/* 4-Color Gradient Ring Container */}
+                        <div className="relative mb-6 group cursor-pointer">
+                            <div
+                                className="p-[3.5px] rounded-full transition-all duration-500 shadow-md group-hover:shadow-[0_0_25px_rgba(37,99,235,0.45),0_0_20px_rgba(16,185,129,0.35),0_0_20px_rgba(249,115,22,0.35),0_0_20px_rgba(239,68,68,0.35)] group-hover:scale-[1.02]"
+                                style={{
+                                    background: 'conic-gradient(from 45deg, #2563eb 0deg, #10b981 90deg, #f97316 180deg, #ef4444 270deg, #2563eb 360deg)'
+                                }}
+                            >
+                                <div className="w-48 h-48 rounded-full border-2 border-white dark:border-slate-800 shadow-inner overflow-hidden relative bg-slate-100 flex items-center justify-center">
+                                    {displayImage ? (
+                                        <img
+                                            src={displayImage}
+                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                                            alt="Profile"
+                                            onError={(e) => {
+                                                (e.currentTarget as HTMLImageElement).src = 'https://img.freepik.com/free-photo/handsome-young-man-with-new-hairstyle-wearing-blue-shirt-feeling-confident-isolated-white-background_176532-8097.jpg';
+                                            }}
+                                        />
+                                    ) : (
+                                        <User className="w-20 h-20 text-slate-300" />
+                                    )}
+                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                                        <ImageIcon className="w-10 h-10 text-white" />
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         <input

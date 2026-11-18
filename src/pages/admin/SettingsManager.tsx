@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import api from '../../api/axios';
+import api, { getMediaUrl } from '../../api/axios';
 
 const labelCls = 'text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5';
 const inputCls = 'w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 text-sm font-bold outline-none focus:border-blue-400 transition-colors';
@@ -116,29 +116,42 @@ const SettingsManager: React.FC = () => {
     const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files || e.target.files.length === 0) return;
         const file = e.target.files[0];
+
+        if (!file.type.startsWith('image/')) {
+            alert('Please select a valid image file (JPG, PNG, or WebP)');
+            return;
+        }
+        if (file.size > 10 * 1024 * 1024) {
+            alert('Image must be under 10MB');
+            return;
+        }
+
         const formData = new FormData();
         formData.append('avatar', file);
 
         setUploadingAvatar(true);
         try {
-            // Note: Since auth logic dictates avatar routes, we'll use the proper route per backend layout
-            // From adminController.js, the update avatar route is POST /api/admin/upload-avatar
-            const res = await api.post('/admin/upload-avatar', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' }
-            });
-            if (res.data.success && res.data.avatar) {
-                setProfileForm(p => ({ ...p, avatar: res.data.avatar }));
-                localStorage.setItem('mangolpuri_admin_avatar', res.data.avatar);
-                // Also sync avatar to the public About page so it reflects on main website
+            const res = await api.post('/admin/upload-avatar', formData);
+            if (res.data && res.data.avatar) {
+                const newAvatar = res.data.avatar;
+                setProfileForm(p => ({ ...p, avatar: newAvatar }));
+                localStorage.setItem('mangolpuri_admin_avatar', newAvatar);
+
+                // Also sync avatar to public About page so it reflects on main website
                 try {
-                    await api.put('/about', { imageUrl: res.data.avatar });
+                    await api.put('/about', { imageUrl: newAvatar });
                 } catch (_) { /* ignore if about update fails */ }
-                window.location.reload();
+
+                // Notify AdminLayout header to update avatar immediately
+                window.dispatchEvent(new Event('storage'));
+            } else {
+                throw new Error(res.data?.message || 'Failed to upload avatar');
             }
         } catch (err: any) {
-            alert(err.response?.data?.message || 'Failed to upload avatar');
+            alert(err.response?.data?.message || err.message || 'Failed to upload avatar');
         } finally {
             setUploadingAvatar(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
         }
     };
 
@@ -164,8 +177,24 @@ const SettingsManager: React.FC = () => {
             <div className="lg:col-span-4 space-y-6">
                 <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden border-b-4 border-b-blue-600/10">
                     <div className="p-8 text-center flex flex-col items-center">
-                        <div className="relative mb-4 group">
-                            <img src={profileForm.avatar || `https://ui-avatars.com/api/?name=${profileForm.name || 'Admin'}&background=eff6ff&color=2563eb`} className="w-24 h-24 rounded-3xl object-cover ring-8 ring-slate-50" />
+                        <div className="relative mb-4 group cursor-pointer">
+                            <div
+                                className="p-[3.5px] rounded-full transition-all duration-500 shadow-md group-hover:shadow-[0_0_25px_rgba(37,99,235,0.45),0_0_20px_rgba(16,185,129,0.35),0_0_20px_rgba(249,115,22,0.35),0_0_20px_rgba(239,68,68,0.35)] group-hover:scale-[1.02]"
+                                style={{
+                                    background: 'conic-gradient(from 45deg, #2563eb 0deg, #10b981 90deg, #f97316 180deg, #ef4444 270deg, #2563eb 360deg)'
+                                }}
+                            >
+                                <div className="w-24 h-24 rounded-full overflow-hidden bg-white dark:bg-slate-900 border-2 border-white dark:border-slate-800 shadow-inner relative">
+                                    <img
+                                        src={profileForm.avatar ? getMediaUrl(profileForm.avatar) : `https://ui-avatars.com/api/?name=${encodeURIComponent(profileForm.name || 'Admin')}&background=eff6ff&color=2563eb`}
+                                        alt={profileForm.name || 'Admin'}
+                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                        onError={(e) => {
+                                            (e.currentTarget as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(profileForm.name || 'Admin')}&background=eff6ff&color=2563eb`;
+                                        }}
+                                    />
+                                </div>
+                            </div>
                             <input
                                 type="file"
                                 accept="image/jpeg, image/png, image/webp"
@@ -177,7 +206,8 @@ const SettingsManager: React.FC = () => {
                                 type="button"
                                 onClick={() => fileInputRef.current?.click()}
                                 disabled={uploadingAvatar}
-                                className="absolute bottom-0 right-0 p-2 bg-blue-600 text-white rounded-xl shadow-lg hover:scale-110 transition-all disabled:opacity-50"
+                                title="Change Profile Photo"
+                                className="absolute bottom-0 right-0 p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg hover:scale-110 active:scale-95 transition-all disabled:opacity-50 border-2 border-white"
                             >
                                 {uploadingAvatar ? (
                                     <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />

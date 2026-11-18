@@ -114,15 +114,25 @@ export const AboutUs: React.FC<AboutUsProps> = ({ content, onSendEnquiry }) => {
 
         {/* Left Column: Profile & Contact */}
         <div className="md:w-1/3 p-6 md:p-8 flex flex-col items-center text-center border-r border-slate-200 dark:border-white/5 relative" style={{ backgroundColor: 'var(--card-bg)' }}>
-          <div className="w-40 h-40 md:w-56 md:h-56 rounded-full border-4 border-white dark:border-slate-800 shadow-xl overflow-hidden mb-6 relative group bg-slate-100 dark:bg-slate-800">
-            <img
-              src={getMediaUrl(activeContent.imageUrl) || defaultContent.imageUrl}
-              alt={activeContent.title}
-              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-              onError={(e) => {
-                (e.currentTarget as HTMLImageElement).src = defaultContent.imageUrl;
+          {/* Profile Picture with 4-Color Gradient Ring & Subtle Hover Glow */}
+          <div className="relative mb-6 group cursor-pointer">
+            <div
+              className="p-[3.5px] rounded-full transition-all duration-500 shadow-md group-hover:shadow-[0_0_25px_rgba(37,99,235,0.45),0_0_20px_rgba(16,185,129,0.35),0_0_20px_rgba(249,115,22,0.35),0_0_20px_rgba(239,68,68,0.35)] group-hover:scale-[1.02]"
+              style={{
+                background: 'conic-gradient(from 45deg, #2563eb 0deg, #10b981 90deg, #f97316 180deg, #ef4444 270deg, #2563eb 360deg)'
               }}
-            />
+            >
+              <div className="w-40 h-40 md:w-56 md:h-56 rounded-full border-2 border-white dark:border-slate-800 shadow-inner overflow-hidden relative bg-slate-100 dark:bg-slate-800">
+                <img
+                  src={getMediaUrl(activeContent.imageUrl) || defaultContent.imageUrl}
+                  alt={activeContent.title}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).src = defaultContent.imageUrl;
+                  }}
+                />
+              </div>
+            </div>
           </div>
 
           <h1 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white mb-2">{activeContent.title}</h1>

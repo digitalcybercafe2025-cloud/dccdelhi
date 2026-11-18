@@ -39,19 +39,19 @@ const avatarStorage = multer.diskStorage({
         cb(null, dir);
     },
     filename: (req, file, cb) => {
-        const ext = path.extname(file.originalname);
+        const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
         cb(null, `avatar-${Date.now()}${ext}`);
     }
 });
 const avatarUpload = multer({
     storage: avatarStorage,
-    limits: { fileSize: 2 * 1024 * 1024 }, // 2MB
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
     fileFilter: (req, file, cb) => {
-        const allowed = /jpeg|jpg|png|webp/;
+        const allowed = /jpeg|jpg|png|webp|gif/;
         const ext = allowed.test(path.extname(file.originalname).toLowerCase());
-        const mime = allowed.test(file.mimetype);
-        if (ext && mime) cb(null, true);
-        else cb(new Error('Only image files allowed'));
+        const mime = allowed.test(file.mimetype) || (file.mimetype && file.mimetype.startsWith('image/'));
+        if (ext || mime) cb(null, true);
+        else cb(new Error('Only image files (JPG, PNG, WebP) are allowed'));
     }
 });
 
@@ -460,6 +460,10 @@ const updateProfile = async (req, res) => {
             admin.recoveryPin = cleanPin;
         }
 
+        if (req.body.avatar !== undefined && req.body.avatar !== null) {
+            admin.avatar = String(req.body.avatar).trim();
+        }
+
         const updated = await admin.save();
 
         res.json({
@@ -537,23 +541,41 @@ const updateSecurityConfig = async (req, res) => {
 // @access  Private
 const uploadAvatar = async (req, res) => {
     try {
-        if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
-
-        const admin = await Admin.findById(req.admin._id);
-        if (!admin) return res.status(404).json({ message: 'Admin not found' });
-
-        // Delete old avatar file if exists and it's a local file
-        if (admin.avatar && admin.avatar.startsWith('/uploads/')) {
-            const oldPath = path.join(__dirname, '..', admin.avatar);
-            if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+        if (!req.file && !req.body.avatar) {
+            return res.status(400).json({ success: false, message: 'No image file uploaded' });
         }
 
-        admin.avatar = `/uploads/avatars/${req.file.filename}`;
+        const admin = await Admin.findById(req.admin._id);
+        if (!admin) return res.status(404).json({ success: false, message: 'Admin not found' });
+
+        if (req.file) {
+            // Delete old avatar file if exists and it's a local file in /uploads/avatars/
+            if (admin.avatar && admin.avatar.startsWith('/uploads/avatars/')) {
+                const oldPath = path.join(__dirname, '..', admin.avatar);
+                if (fs.existsSync(oldPath)) {
+                    try { fs.unlinkSync(oldPath); } catch (_) {}
+                }
+            }
+            admin.avatar = `/uploads/avatars/${req.file.filename}`;
+        } else if (req.body.avatar) {
+            admin.avatar = String(req.body.avatar).trim();
+        }
+
         await admin.save();
 
-        res.json({ success: true, avatar: admin.avatar });
+        res.json({
+            success: true,
+            avatar: admin.avatar,
+            message: 'Profile photo updated successfully',
+            data: {
+                _id: admin._id,
+                name: admin.name,
+                email: admin.email,
+                avatar: admin.avatar
+            }
+        });
     } catch (error) {
-        res.status(500).json({ message: 'Server Error: ' + error.message });
+        res.status(500).json({ success: false, message: 'Server Error: ' + error.message });
     }
 };
 
