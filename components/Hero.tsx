@@ -258,14 +258,87 @@ export const Hero: React.FC<HeroProps> = ({ messages = [], slides = [] }) => {
     });
   };
 
-  // Helper to render icon (custom upload, emoji, or Lucide fallback)
+  // Helper to render category badge with letter gradient
+  const renderCategoryBadge = (categoryType: string) => {
+    if (!categoryType) return null;
+    const type = categoryType.toLowerCase();
+    let grad = 'from-blue-600 to-indigo-600';
+    let border = 'border-blue-200/80 dark:border-blue-800/50 bg-blue-50/70 dark:bg-blue-950/30';
+    let dot = 'bg-blue-500';
+
+    if (type.includes('important')) {
+      grad = 'from-red-600 via-rose-500 to-amber-500';
+      border = 'border-red-200/80 dark:border-red-800/50 bg-red-50/70 dark:bg-red-950/30';
+      dot = 'bg-red-500';
+    } else if (type.includes('special')) {
+      grad = 'from-purple-600 via-fuchsia-500 to-pink-500';
+      border = 'border-purple-200/80 dark:border-purple-800/50 bg-purple-50/70 dark:bg-purple-950/30';
+      dot = 'bg-purple-500';
+    } else if (type.includes('alert')) {
+      grad = 'from-rose-600 via-red-600 to-orange-500';
+      border = 'border-rose-200/80 dark:border-rose-800/50 bg-rose-50/70 dark:bg-rose-950/30';
+      dot = 'bg-rose-500';
+    } else if (type.includes('festival')) {
+      grad = 'from-amber-500 via-orange-500 to-rose-500';
+      border = 'border-amber-200/80 dark:border-amber-800/50 bg-amber-50/70 dark:bg-amber-950/30';
+      dot = 'bg-amber-500';
+    } else if (type.includes('scheme')) {
+      grad = 'from-blue-600 via-cyan-500 to-teal-500';
+      border = 'border-blue-200/80 dark:border-blue-800/50 bg-blue-50/70 dark:bg-blue-950/30';
+      dot = 'bg-cyan-500';
+    } else if (type.includes('offer')) {
+      grad = 'from-emerald-600 via-teal-500 to-cyan-500';
+      border = 'border-emerald-200/80 dark:border-emerald-800/50 bg-emerald-50/70 dark:bg-emerald-950/30';
+      dot = 'bg-emerald-500';
+    }
+
+    return (
+      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border shadow-xs ${border}`}>
+        <span className={`w-1 h-1 rounded-full ${dot} shrink-0`} />
+        <span className={`bg-gradient-to-r ${grad} bg-clip-text text-transparent font-black`}>
+          {categoryType}
+        </span>
+      </span>
+    );
+  };
+
+  // Helper to render action button (Solid Blue or Multicolor Gradient)
+  const renderActionButton = (msg: any, isModal = false) => {
+    if (!msg.actionUrl) return null;
+    const isGradient = msg.actionButtonStyle === 'gradient';
+    const btnClass = isGradient
+      ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-md shadow-indigo-500/20'
+      : 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm';
+
+    const padding = isModal
+      ? 'px-3.5 py-1.5 text-[11px]'
+      : 'px-3 py-1 text-[10px] sm:text-[11px]';
+
+    return (
+      <a
+        href={msg.actionUrl}
+        target={msg.actionUrl.startsWith('http') ? '_blank' : '_self'}
+        rel="noopener noreferrer"
+        onClick={(e) => e.stopPropagation()}
+        className={`inline-flex items-center gap-1.5 ${padding} rounded-lg font-black uppercase tracking-wider transition-all hover:scale-105 active:scale-95 group/btn ${btnClass}`}
+      >
+        <span>{msg.actionText || 'Apply Now / View Details'}</span>
+        <ExternalLink className="w-3 h-3 group-hover/btn:translate-x-0.5 transition-transform" />
+      </a>
+    );
+  };
+
+  // Helper to render icon (custom upload, emoji, or Lucide fallback with safe image error handling)
   const renderNoticeIcon = (msg: any) => {
     if (msg.iconImage) {
       return (
         <img
           src={getMediaUrl(msg.iconImage)}
-          alt={msg.title}
+          alt={msg.title || 'Notice'}
           className="w-7 h-7 object-contain rounded-lg"
+          onError={(e) => {
+            (e.currentTarget as HTMLElement).style.display = 'none';
+          }}
         />
       );
     }
@@ -507,25 +580,25 @@ export const Hero: React.FC<HeroProps> = ({ messages = [], slides = [] }) => {
                       <div className="flex-1 min-w-0 z-10 flex flex-col justify-center">
                         {/* Title and Live Badge */}
                         <div className="flex items-center gap-2 flex-wrap mb-1">
-                          <h4 className="text-[#0f172a] dark:text-white font-extrabold text-[13px] sm:text-[14px] uppercase tracking-tight line-clamp-2 leading-snug">
+                          <h4
+                            style={{ color: msg.titleColor || undefined }}
+                            className="text-[#0f172a] dark:text-white font-extrabold text-[13px] sm:text-[14px] uppercase tracking-tight line-clamp-2 leading-snug"
+                          >
                             {noticeTitle}
                           </h4>
                         </div>
 
-                        <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                        <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
                           <span className="bg-[#fff1f2] dark:bg-rose-500/15 text-[#f43f5e] dark:text-rose-400 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider inline-block">
                             {msg.badge || 'LIVE'}
                           </span>
-                          {msg.type && msg.type !== 'Important' && (
-                            <span className="bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase">
-                              {msg.type}
-                            </span>
-                          )}
+                          {renderCategoryBadge(msg.type || 'Important')}
                         </div>
 
                         {/* Description Preview or Expanded */}
                         <div className="flex flex-col gap-1.5">
                           <p
+                            style={{ color: msg.descriptionColor || undefined }}
                             className={`text-[12px] sm:text-[13px] text-slate-600 dark:text-slate-300 font-medium leading-relaxed ${
                               isExpanded ? 'max-h-40 overflow-y-auto pr-1.5 custom-scroll' : 'line-clamp-2'
                             }`}
@@ -534,19 +607,8 @@ export const Hero: React.FC<HeroProps> = ({ messages = [], slides = [] }) => {
                           </p>
 
                           <div className="flex items-center justify-between gap-2 pt-0.5 flex-wrap">
-                            {/* Action Button: Works with actionUrl or default label */}
-                            {msg.actionUrl ? (
-                              <a
-                                href={msg.actionUrl}
-                                target={msg.actionUrl.startsWith('http') ? '_blank' : '_self'}
-                                rel="noopener noreferrer"
-                                onClick={(e) => e.stopPropagation()}
-                                className="inline-flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg text-[10px] sm:text-[11px] font-black uppercase tracking-wider transition-all shadow-sm hover:scale-105 active:scale-95 group/btn"
-                              >
-                                <span>{msg.actionText || 'Apply Now / View Details'}</span>
-                                <ExternalLink className="w-3 h-3 group-hover/btn:translate-x-0.5 transition-transform" />
-                              </a>
-                            ) : <span />}
+                            {/* Action Button: Solid Blue or Gradient */}
+                            {renderActionButton(msg, false)}
 
                             {/* See More / See Less Toggle */}
                             {descriptionText.length > 50 && (
@@ -623,56 +685,58 @@ export const Hero: React.FC<HeroProps> = ({ messages = [], slides = [] }) => {
               </button>
             </div>
 
-            {/* Modal Content - Scrollable */}
-            <div className="flex-1 overflow-y-auto p-5 md:p-6 flex flex-col gap-4 custom-scroll">
+            {/* Modal Content - Scrollable with shrink-0 non-collapsing cards */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col gap-3.5 custom-scroll">
               {allActiveMessages.length > 0 ? (
                 allActiveMessages.map((msg, idx) => {
+                  const noticeTitle = msg.title || (msg.text?.includes(':') ? msg.text.split(':')[0] : msg.text) || 'OFFICIAL NOTICE';
+                  const descriptionText = msg.description || msg.shortDescription || (msg.text?.includes(':') ? msg.text.split(':')[1] : msg.text) || '';
+
                   return (
                     <div
                       key={msg._id || msg.id || idx}
-                      className="p-4 rounded-2xl bg-white dark:bg-slate-800 shadow-[0_2px_15px_rgba(0,0,0,0.04)] border border-slate-100 dark:border-slate-700 flex gap-4 items-start relative overflow-hidden"
+                      className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-800 shadow-[0_4px_20px_rgba(0,0,0,0.04)] border border-slate-100 dark:border-slate-700/80 flex gap-3.5 sm:gap-4 items-start relative shrink-0 transition-all hover:border-blue-200 dark:hover:border-blue-500/30"
                     >
-                      <div className="shrink-0 w-12 h-12 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-700/80 shadow-sm flex items-center justify-center z-10">
+                      <div className="shrink-0 w-11 h-11 sm:w-12 sm:h-12 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-700/80 shadow-sm flex items-center justify-center z-10">
                         {renderNoticeIcon(msg)}
                       </div>
 
                       <div className="flex-1 min-w-0 z-10">
                         <div className="flex items-center justify-between mb-1.5 flex-wrap gap-2">
-                          <h4 className="text-[#0f172a] dark:text-white font-extrabold text-[15px] uppercase tracking-tight">
-                            {msg.title || (msg.text?.includes(':') ? msg.text.split(':')[0] : msg.text) || 'OFFICIAL NOTICE'}
+                          <h4
+                            style={{ color: msg.titleColor || undefined }}
+                            className="text-[#0f172a] dark:text-white font-extrabold text-[14px] sm:text-[15px] uppercase tracking-tight"
+                          >
+                            {noticeTitle}
                           </h4>
-                          <span className="bg-[#fff1f2] dark:bg-rose-500/15 text-[#f43f5e] dark:text-rose-400 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider">
-                            {msg.badge || 'LIVE'}
-                          </span>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="bg-[#fff1f2] dark:bg-rose-500/15 text-[#f43f5e] dark:text-rose-400 text-[9px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                              {msg.badge || 'LIVE'}
+                            </span>
+                            {renderCategoryBadge(msg.type || 'Important')}
+                          </div>
                         </div>
 
-                        <p className="text-[13px] font-medium text-slate-600 dark:text-slate-300 leading-relaxed mb-3">
-                          {renderHighlightedText(msg.description || msg.shortDescription || (msg.text?.includes(':') ? msg.text.split(':')[1] : msg.text) || '')}
+                        <p
+                          style={{ color: msg.descriptionColor || undefined }}
+                          className="text-[12px] sm:text-[13px] font-medium text-slate-600 dark:text-slate-300 leading-relaxed mb-3"
+                        >
+                          {renderHighlightedText(descriptionText)}
                         </p>
 
-                        <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-700/60 flex-wrap gap-2 text-[11px] text-slate-400 font-semibold">
+                        <div className="flex items-center justify-between pt-2.5 border-t border-slate-100 dark:border-slate-700/60 flex-wrap gap-2 text-[11px] text-slate-400 font-semibold">
                           <div className="flex items-center gap-2">
                             <Clock className="w-3.5 h-3.5 text-slate-400" />
                             {msg.isLifetime ? (
                               <span className="text-emerald-600 dark:text-emerald-400 font-bold">Lifetime Active</span>
                             ) : msg.expiryDate ? (
-                              <span>Expires: {new Date(msg.expiryDate).toLocaleDateString()}</span>
+                              <span>Expires: {new Date(msg.expiryDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                             ) : (
                               <span>Active</span>
                             )}
                           </div>
 
-                          {msg.actionUrl && (
-                            <a
-                              href={msg.actionUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center gap-1.5 text-blue-600 dark:text-blue-400 font-bold hover:underline"
-                            >
-                              {msg.actionText || 'Take Action'}
-                              <ExternalLink className="w-3.5 h-3.5" />
-                            </a>
-                          )}
+                          {renderActionButton(msg, true)}
                         </div>
                       </div>
                     </div>

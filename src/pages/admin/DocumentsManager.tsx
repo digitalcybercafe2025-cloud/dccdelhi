@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, FileText, Download, Eye, Loader2, Calendar, Trash2, AlertTriangle, X, Check } from 'lucide-react';
+import { Search, FileText, Download, Eye, Loader2, Calendar, Trash2, AlertTriangle, X, Check, LayoutGrid, List, Settings, Plus } from 'lucide-react';
 import api, { getMediaUrl } from '../../api/axios';
 
 interface Doc {
@@ -38,7 +38,19 @@ const DocumentsManager: React.FC<Props> = ({ viewMode = 'list' }) => {
     const [applications, setApplications] = useState<Application[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [currentViewMode, setCurrentViewMode] = useState<'grid' | 'list'>(() => (localStorage.getItem('admin_documents_view') as any) || viewMode || 'list');
     
+    // Modals
+    const [showSettingsModal, setShowSettingsModal] = useState(false);
+    const [showUploadModal, setShowUploadModal] = useState(false);
+    const [selectedDocTypeFilter, setSelectedDocTypeFilter] = useState('all');
+
+    // Upload state
+    const [uploadAppId, setUploadAppId] = useState('');
+    const [uploadDocType, setUploadDocType] = useState('Aadhaar Card');
+    const [uploadFile, setUploadFile] = useState<File | null>(null);
+    const [uploading, setUploading] = useState(false);
+
     // Delete Confirmation State
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
     const [confirmText, setConfirmText] = useState('');
@@ -46,11 +58,20 @@ const DocumentsManager: React.FC<Props> = ({ viewMode = 'list' }) => {
     const [deleting, setDeleting] = useState(false);
     const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
+    const handleViewModeChange = (mode: 'grid' | 'list') => {
+        setCurrentViewMode(mode);
+        localStorage.setItem('admin_documents_view', mode);
+    };
+
     const fetchDocuments = async () => {
         setLoading(true);
         try {
             const res = await api.get('/applications?limit=100');
-            setApplications(res.data.data || []);
+            const data = res.data.data || [];
+            setApplications(data);
+            if (data.length > 0 && !uploadAppId) {
+                setUploadAppId(data[0]._id);
+            }
         } catch (err) {
             console.error(err);
         } finally {
@@ -62,11 +83,22 @@ const DocumentsManager: React.FC<Props> = ({ viewMode = 'list' }) => {
         fetchDocuments();
     }, []);
 
-    const filteredApps = applications.filter(app =>
-        app.userDetails?.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        app.trackingId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        app.serviceName?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredApps = applications.filter(app => {
+        const matchesSearch =
+            app.userDetails?.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            app.trackingId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            app.serviceName?.toLowerCase().includes(searchTerm.toLowerCase());
+        
+        if (!matchesSearch) return false;
+
+        if (selectedDocTypeFilter !== 'all') {
+            return app.documents?.some(d => d.docType?.toLowerCase().includes(selectedDocTypeFilter.toLowerCase()) || d.originalName?.toLowerCase().includes(selectedDocTypeFilter.toLowerCase()));
+        }
+        return true;
+    });
+
+    // Count total documents
+    const totalDocsCount = applications.reduce((acc, a) => acc + (a.documents?.length || 0), 0);
 
     const handleDownload = (path: string, name: string) => {
         const fullUrl = getMediaUrl(path);
@@ -82,6 +114,38 @@ const DocumentsManager: React.FC<Props> = ({ viewMode = 'list' }) => {
     const handleView = (path: string) => {
         const fullUrl = getMediaUrl(path);
         window.open(fullUrl, '_blank');
+    };
+
+    const handleUploadDocument = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!uploadAppId) {
+            alert('Please select an application.');
+            return;
+        }
+        if (!uploadFile) {
+            alert('Please choose a file to upload.');
+            return;
+        }
+        setUploading(true);
+        try {
+            const fd = new FormData();
+            fd.append('certificate', uploadFile);
+            fd.append('docType', uploadDocType);
+            const res = await api.post(`/applications/${uploadAppId}/certificate`, fd, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            if (res.data?.success) {
+                setFeedback({ type: 'success', message: `Document (${uploadDocType}) uploaded successfully!` });
+                setShowUploadModal(false);
+                setUploadFile(null);
+                await fetchDocuments();
+                setTimeout(() => setFeedback(null), 3500);
+            }
+        } catch (err: any) {
+            alert(err.response?.data?.message || 'Failed to upload document.');
+        } finally {
+            setUploading(false);
+        }
     };
 
     const openDeleteConfirm = (appId: string, docIndex: number, docName: string, applicant: string) => {
@@ -110,20 +174,63 @@ const DocumentsManager: React.FC<Props> = ({ viewMode = 'list' }) => {
 
     return (
         <div className="space-y-4 animate-in fade-in duration-300">
-            {/* Header + Search - Ultra Compact */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                <div>
-                    <h2 className="text-xl font-black text-slate-900 tracking-tight">Document Archives</h2>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Global Artifact Fulfillment Center</p>
+            {/* ── Top Toolbar (Matching exact reference screenshot layout) ── */}
+            <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center justify-between bg-white p-4 sm:p-5 rounded-3xl border border-slate-100 shadow-sm transition-all duration-300">
+                {/* Left: Search with Search Icon on the right side */}
+                <div className="flex flex-1 items-center gap-3">
+                    <div className="relative flex-1 max-w-sm">
+                        <input
+                            value={searchTerm}
+                            onChange={e => setSearchTerm(e.target.value)}
+                            placeholder="Search documents..."
+                            className="w-full pl-4 pr-10 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 placeholder:text-slate-400 text-sm font-bold outline-none focus:border-blue-400 transition-colors shadow-sm"
+                        />
+                        <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                    </div>
                 </div>
-                <div className="relative group w-full sm:w-64">
-                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 group-focus-within:text-blue-500" />
-                    <input
-                        value={searchTerm}
-                        onChange={e => setSearchTerm(e.target.value)}
-                        placeholder="Search applicant, ID, service..."
-                        className="w-full pl-9 pr-3 py-2 bg-white rounded-xl border border-slate-200 text-xs font-semibold outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-400 shadow-sm transition-all"
-                    />
+
+                {/* Right controls: [ Grid | List ] toggle -> [ ⚙ SETTINGS ] -> [ + UPLOAD DOC ] */}
+                <div className="flex items-center gap-2.5 flex-wrap">
+                    {/* 1. View Toggle */}
+                    <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/70">
+                        <button
+                            type="button"
+                            onClick={() => handleViewModeChange('grid')}
+                            className={`p-2 rounded-lg transition-all ${currentViewMode === 'grid' ? 'bg-white shadow-sm text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-700'}`}
+                            title="Grid View"
+                        >
+                            <LayoutGrid size={16} />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => handleViewModeChange('list')}
+                            className={`p-2 rounded-lg transition-all ${currentViewMode === 'list' ? 'bg-white shadow-sm text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-700'}`}
+                            title="List View"
+                        >
+                            <List size={16} />
+                        </button>
+                    </div>
+
+                    {/* 2. Settings Button */}
+                    <button
+                        type="button"
+                        onClick={() => setShowSettingsModal(true)}
+                        className="flex items-center gap-2 px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200/80 text-slate-700 rounded-xl font-bold text-xs uppercase tracking-wider transition-all border border-slate-200 active:scale-95"
+                        title="Document Archive Settings"
+                    >
+                        <Settings size={15} className="text-slate-500" />
+                        <span className="hidden sm:inline">Settings</span>
+                    </button>
+
+                    {/* 3. Upload Doc Button */}
+                    <button
+                        type="button"
+                        onClick={() => setShowUploadModal(true)}
+                        className="flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-md shadow-blue-500/25 active:scale-95"
+                    >
+                        <Plus size={15} strokeWidth={3} />
+                        <span>Upload Doc</span>
+                    </button>
                 </div>
             </div>
 
@@ -145,7 +252,7 @@ const DocumentsManager: React.FC<Props> = ({ viewMode = 'list' }) => {
                     <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
                     <p className="mt-3 text-[10px] font-black text-slate-400 uppercase tracking-widest animate-pulse">Loading Documents Archive...</p>
                 </div>
-            ) : viewMode === 'grid' ? (
+            ) : currentViewMode === 'grid' ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                     {filteredApps.map(app => (
                         app.documents && app.documents.length > 0 ? (
@@ -329,6 +436,210 @@ const DocumentsManager: React.FC<Props> = ({ viewMode = 'list' }) => {
                                 </button>
                             </div>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Document Archive Settings Modal ── */}
+            {showSettingsModal && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200"
+                    onClick={() => setShowSettingsModal(false)}
+                >
+                    <div
+                        className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200 p-6 space-y-5"
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                            <div className="flex items-center gap-2.5">
+                                <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+                                    <Settings size={18} />
+                                </div>
+                                <div>
+                                    <h3 className="text-sm font-black text-slate-900 uppercase">Document Archive Settings</h3>
+                                    <p className="text-[10px] text-slate-400 font-bold">Display Preferences & Category Filtering</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setShowSettingsModal(false)}
+                                className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        {/* Setting 1: Default View Mode */}
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
+                                Default View Mode
+                            </label>
+                            <div className="grid grid-cols-2 gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => handleViewModeChange('grid')}
+                                    className={`py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border transition-all ${
+                                        currentViewMode === 'grid' ? 'bg-blue-50 border-blue-500 text-blue-600' : 'bg-slate-50 border-slate-200 text-slate-600'
+                                    }`}
+                                >
+                                    <LayoutGrid size={15} /> Card Grid
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleViewModeChange('list')}
+                                    className={`py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border transition-all ${
+                                        currentViewMode === 'list' ? 'bg-blue-50 border-blue-500 text-blue-600' : 'bg-slate-50 border-slate-200 text-slate-600'
+                                    }`}
+                                >
+                                    <List size={15} /> Table List
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Setting 2: Filter by document type */}
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
+                                Filter by Document Type
+                            </label>
+                            <div className="flex flex-wrap gap-1.5">
+                                {['all', 'Aadhaar', 'PAN', 'Photo', 'Marksheet', 'Certificate'].map(type => (
+                                    <button
+                                        key={type}
+                                        type="button"
+                                        onClick={() => setSelectedDocTypeFilter(type)}
+                                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                                            selectedDocTypeFilter === type
+                                                ? 'bg-blue-600 text-white border-blue-600'
+                                                : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                                        }`}
+                                    >
+                                        {type === 'all' ? 'All Types' : type}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Setting 3: Archive stats */}
+                        <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
+                            <div className="flex items-center justify-between text-xs">
+                                <span className="font-bold text-slate-500">Total Documents Managed:</span>
+                                <span className="font-black text-blue-600">{totalDocsCount} files</span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs">
+                                <span className="font-bold text-slate-500">Associated Applications:</span>
+                                <span className="font-black text-slate-800">{applications.length} applications</span>
+                            </div>
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={() => setShowSettingsModal(false)}
+                            className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-black uppercase tracking-wider transition-all"
+                        >
+                            Apply & Close
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Upload Document Modal ── */}
+            {showUploadModal && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200"
+                    onClick={() => setShowUploadModal(false)}
+                >
+                    <div
+                        className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col"
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-blue-50/40">
+                            <div className="flex items-center gap-2.5">
+                                <div className="p-2 bg-blue-600 text-white rounded-xl shadow-md shadow-blue-500/20">
+                                    <Plus size={18} strokeWidth={3} />
+                                </div>
+                                <div>
+                                    <h3 className="text-sm font-black text-slate-900 uppercase">Upload Document</h3>
+                                    <p className="text-[10px] text-slate-400 font-bold">Attach file or completed certificate</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setShowUploadModal(false)}
+                                className="p-1.5 hover:bg-white rounded-lg text-slate-400 hover:text-slate-600 transition-colors"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleUploadDocument} className="p-6 space-y-4">
+                            <div>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">
+                                    Target Application *
+                                </label>
+                                <select
+                                    required
+                                    value={uploadAppId}
+                                    onChange={e => setUploadAppId(e.target.value)}
+                                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-800 outline-none focus:border-blue-500"
+                                >
+                                    {applications.map(app => (
+                                        <option key={app._id} value={app._id}>
+                                            #{app.trackingId} — {app.userDetails?.fullName} ({app.serviceName})
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">
+                                    Document Label / Type *
+                                </label>
+                                <select
+                                    value={uploadDocType}
+                                    onChange={e => setUploadDocType(e.target.value)}
+                                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-800 outline-none focus:border-blue-500"
+                                >
+                                    <option value="Aadhaar Card">Aadhaar Card</option>
+                                    <option value="PAN Card">PAN Card</option>
+                                    <option value="Passport Photo">Passport Photo</option>
+                                    <option value="10th Marksheet">10th Marksheet</option>
+                                    <option value="12th Marksheet">12th Marksheet</option>
+                                    <option value="Income Certificate">Income Certificate</option>
+                                    <option value="Caste Certificate">Caste Certificate</option>
+                                    <option value="Completion Certificate">Fulfillment / Completion Certificate</option>
+                                    <option value="Other Document">Other Document</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">
+                                    Select File (PDF, JPG, PNG) *
+                                </label>
+                                <input
+                                    required
+                                    type="file"
+                                    accept=".pdf,.jpg,.jpeg,.png,.webp"
+                                    onChange={e => setUploadFile(e.target.files?.[0] || null)}
+                                    className="w-full text-xs text-slate-500 file:mr-2 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-black file:bg-blue-50 file:text-blue-600 hover:file:bg-blue-100"
+                                />
+                            </div>
+
+                            <div className="pt-2 flex items-center justify-end gap-2.5">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowUploadModal(false)}
+                                    className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition-all"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={uploading}
+                                    className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md shadow-blue-500/25 flex items-center gap-2"
+                                >
+                                    {uploading ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} strokeWidth={3} />}
+                                    Upload Document
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}

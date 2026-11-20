@@ -17,6 +17,9 @@ const liveNoticeSchema = new mongoose.Schema({
     isLifetime: { type: Boolean, default: false },
     actionText: { type: String }, // e.g. "Apply Now"
     actionUrl: { type: String }, // e.g. "/apply/..."
+    titleColor: { type: String, default: '' }, // custom font color for Title
+    descriptionColor: { type: String, default: '' }, // custom font color for Description
+    actionButtonStyle: { type: String, default: 'blue' }, // 'blue' or 'gradient'
 }, { timestamps: true });
 
 module.exports = mongoose.model('LiveNotice', liveNoticeSchema);

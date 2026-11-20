@@ -24,6 +24,9 @@ interface Notice {
   isLifetime: boolean;
   actionText?: string;
   actionUrl?: string;
+  titleColor?: string;
+  descriptionColor?: string;
+  actionButtonStyle?: 'blue' | 'gradient';
   createdAt?: string;
 }
 
@@ -72,6 +75,53 @@ const EMOJI_PRESETS = [
 
 const CATEGORIES = ['Important', 'Special', 'Alert', 'Festival', 'Scheme', 'Offer'];
 
+export const getCategoryGradient = (type: string) => {
+  switch (type?.toLowerCase()) {
+    case 'important':
+      return {
+        textGradient: 'bg-gradient-to-r from-red-600 via-rose-500 to-amber-500 bg-clip-text text-transparent font-black',
+        border: 'border-red-200 dark:border-red-800/40 bg-red-50/60 dark:bg-red-950/20',
+        dot: 'bg-red-500'
+      };
+    case 'special':
+      return {
+        textGradient: 'bg-gradient-to-r from-purple-600 via-fuchsia-500 to-pink-500 bg-clip-text text-transparent font-black',
+        border: 'border-purple-200 dark:border-purple-800/40 bg-purple-50/60 dark:bg-purple-950/20',
+        dot: 'bg-purple-500'
+      };
+    case 'alert':
+      return {
+        textGradient: 'bg-gradient-to-r from-rose-600 via-red-600 to-orange-500 bg-clip-text text-transparent font-black',
+        border: 'border-rose-200 dark:border-rose-800/40 bg-rose-50/60 dark:bg-rose-950/20',
+        dot: 'bg-rose-500'
+      };
+    case 'festival':
+      return {
+        textGradient: 'bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 bg-clip-text text-transparent font-black',
+        border: 'border-amber-200 dark:border-amber-800/40 bg-amber-50/60 dark:bg-amber-950/20',
+        dot: 'bg-amber-500'
+      };
+    case 'scheme':
+      return {
+        textGradient: 'bg-gradient-to-r from-blue-600 via-cyan-500 to-teal-500 bg-clip-text text-transparent font-black',
+        border: 'border-blue-200 dark:border-blue-800/40 bg-blue-50/60 dark:bg-blue-950/20',
+        dot: 'bg-blue-500'
+      };
+    case 'offer':
+      return {
+        textGradient: 'bg-gradient-to-r from-emerald-600 via-teal-500 to-cyan-500 bg-clip-text text-transparent font-black',
+        border: 'border-emerald-200 dark:border-emerald-800/40 bg-emerald-50/60 dark:bg-emerald-950/20',
+        dot: 'bg-emerald-500'
+      };
+    default:
+      return {
+        textGradient: 'bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent font-black',
+        border: 'border-blue-200 dark:border-blue-800/40 bg-blue-50/60 dark:bg-blue-950/20',
+        dot: 'bg-blue-500'
+      };
+  }
+};
+
 const LiveNoticesManager: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'notices' | 'animation' | 'preview'>('notices');
   const [notices, setNotices] = useState<Notice[]>([]);
@@ -102,6 +152,9 @@ const LiveNoticesManager: React.FC = () => {
     isLifetime: false,
     actionText: '',
     actionUrl: '',
+    titleColor: '',
+    descriptionColor: '',
+    actionButtonStyle: 'blue',
     status: true,
     order: 0,
   });
@@ -161,6 +214,9 @@ const LiveNoticesManager: React.FC = () => {
       isLifetime: false,
       actionText: '',
       actionUrl: '',
+      titleColor: '',
+      descriptionColor: '',
+      actionButtonStyle: 'blue',
       status: true,
       order: notices.length,
     });
@@ -184,6 +240,9 @@ const LiveNoticesManager: React.FC = () => {
       isLifetime: notice.isLifetime || false,
       actionText: notice.actionText || '',
       actionUrl: notice.actionUrl || '',
+      titleColor: notice.titleColor || '',
+      descriptionColor: notice.descriptionColor || '',
+      actionButtonStyle: notice.actionButtonStyle || 'blue',
       status: notice.status !== false,
       order: notice.order || 0,
     });
@@ -367,7 +426,23 @@ const LiveNoticesManager: React.FC = () => {
   // Helper render icon
   const renderNoticeIcon = (n: Notice) => {
     if (n.iconImage) {
-      return <img src={getMediaUrl(n.iconImage)} alt={n.title} className="w-6 h-6 object-contain rounded" />;
+      return (
+        <img
+          src={getMediaUrl(n.iconImage)}
+          alt={n.title}
+          className="w-6 h-6 object-contain rounded"
+          onError={(e) => {
+            const target = e.currentTarget;
+            target.style.display = 'none';
+            if (target.parentElement) {
+              const fallback = document.createElement('span');
+              fallback.className = 'text-xl leading-none select-none';
+              fallback.textContent = '📢';
+              target.parentElement.appendChild(fallback);
+            }
+          }}
+        />
+      );
     }
     if (n.icon && /\p{Emoji}/u.test(n.icon)) {
       return <span className="text-xl leading-none select-none">{n.icon}</span>;
@@ -493,9 +568,16 @@ const LiveNoticesManager: React.FC = () => {
                             {notice.status ? 'LIVE ON SITE' : 'INACTIVE'}
                           </span>
 
-                          <span className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400">
-                            {notice.type}
-                          </span>
+                          {(() => {
+                            const catStyle = getCategoryGradient(notice.type);
+                            return (
+                              <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider border ${catStyle.badge}`}>
+                                <span className={`bg-gradient-to-r ${catStyle.text} bg-clip-text text-transparent font-black`}>
+                                  {notice.type}
+                                </span>
+                              </span>
+                            );
+                          })()}
 
                           {notice.priority === 'High' && (
                             <span className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-rose-50 dark:bg-rose-500/10 text-rose-600">
@@ -547,7 +629,10 @@ const LiveNoticesManager: React.FC = () => {
 
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <h3 className="font-extrabold text-[#0f172a] dark:text-white text-base tracking-tight truncate">
+                            <h3
+                              className="font-extrabold text-[#0f172a] dark:text-white text-base tracking-tight truncate"
+                              style={{ color: notice.titleColor || undefined }}
+                            >
                               {notice.title}
                             </h3>
                             <span className="bg-[#fff1f2] dark:bg-rose-500/15 text-[#f43f5e] dark:text-rose-400 text-[9px] font-black px-2 py-0.5 rounded-full uppercase">
@@ -555,13 +640,22 @@ const LiveNoticesManager: React.FC = () => {
                             </span>
                           </div>
 
-                          <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mt-1 leading-relaxed">
+                          <p
+                            className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mt-1 leading-relaxed"
+                            style={{ color: notice.descriptionColor || undefined }}
+                          >
                             {notice.description}
                           </p>
 
                           {notice.actionUrl && (
                             <div className="mt-2 flex items-center gap-1.5 flex-wrap">
-                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-lg text-[10px] font-bold">
+                              <span
+                                className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[10px] font-bold ${
+                                  notice.actionButtonStyle === 'gradient'
+                                    ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-pink-600 text-white shadow-sm'
+                                    : 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800'
+                                }`}
+                              >
                                 <ExternalLink size={11} /> {notice.actionText || 'Apply Now'}: <span className="underline truncate max-w-[180px]">{notice.actionUrl}</span>
                               </span>
                             </div>
@@ -950,13 +1044,31 @@ const LiveNoticesManager: React.FC = () => {
                         <div className="h-8 w-[1.5px] bg-slate-200 dark:bg-slate-700 shrink-0 z-10" />
 
                         <div className="flex-1 min-w-0 z-10">
-                          <h4 className="text-[#0f172a] dark:text-white font-extrabold text-[14px] uppercase tracking-tight truncate">
+                          <h4
+                            className="font-extrabold text-[14px] uppercase tracking-tight truncate text-[#0f172a] dark:text-white"
+                            style={{ color: msg.titleColor || undefined }}
+                          >
                             {msg.title}
                           </h4>
-                          <span className="bg-[#fff1f2] dark:bg-rose-500/15 text-[#f43f5e] dark:text-rose-400 text-[9px] font-black px-2 py-0.5 rounded-full uppercase inline-block my-0.5">
-                            {msg.badge || 'LIVE'}
-                          </span>
-                          <p className="text-[12px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-snug">
+                          <div className="flex items-center gap-1.5 flex-wrap my-0.5">
+                            <span className="bg-[#fff1f2] dark:bg-rose-500/15 text-[#f43f5e] dark:text-rose-400 text-[9px] font-black px-2 py-0.5 rounded-full uppercase inline-block">
+                              {msg.badge || 'LIVE'}
+                            </span>
+                            {(() => {
+                              const catStyle = getCategoryGradient(msg.type);
+                              return (
+                                <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider border ${catStyle.badge}`}>
+                                  <span className={`bg-gradient-to-r ${catStyle.text} bg-clip-text text-transparent font-black`}>
+                                    {msg.type}
+                                  </span>
+                                </span>
+                              );
+                            })()}
+                          </div>
+                          <p
+                            className="text-[12px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-snug"
+                            style={{ color: msg.descriptionColor || undefined }}
+                          >
                             {msg.description}
                           </p>
                         </div>
@@ -1127,52 +1239,236 @@ const LiveNoticesManager: React.FC = () => {
                 )}
               </div>
 
-              {/* Type, Badge & Priority */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                    Category Type
+              {/* Typography & Font Colors (Title & Description) */}
+              <div className="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-100 dark:border-slate-700 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                    Font Colors (Title & Description)
                   </label>
-                  <select
-                    value={formData.type}
-                    onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold text-slate-800 dark:text-white outline-none"
-                  >
-                    {CATEGORIES.map((cat) => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                  </select>
+                  {(formData.titleColor || formData.descriptionColor) && (
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, titleColor: '', descriptionColor: '' })}
+                      className="text-[10px] font-bold text-slate-400 hover:text-red-500 transition-colors"
+                    >
+                      Reset to Defaults
+                    </button>
+                  )}
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                    Badge Text
-                  </label>
-                  <input
-                    value={formData.badge}
-                    onChange={(e) => setFormData({ ...formData, badge: e.target.value })}
-                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold text-slate-800 dark:text-white outline-none"
-                    placeholder="LIVE"
-                  />
-                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Title Color */}
+                  <div className="space-y-1.5">
+                    <span className="text-[10px] text-slate-500 font-bold block">Title Font Color</span>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={formData.titleColor || '#0f172a'}
+                        onChange={(e) => setFormData({ ...formData, titleColor: e.target.value })}
+                        className="w-9 h-9 p-0.5 rounded-xl border border-slate-200 dark:border-slate-700 cursor-pointer bg-white"
+                        title="Pick Custom Color"
+                      />
+                      <input
+                        type="text"
+                        value={formData.titleColor}
+                        onChange={(e) => setFormData({ ...formData, titleColor: e.target.value })}
+                        placeholder="#0f172a (Default)"
+                        className="flex-1 px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-mono font-bold text-slate-800 dark:text-white"
+                      />
+                    </div>
+                    {/* Quick Color Swatches */}
+                    <div className="flex items-center gap-1.5 pt-1">
+                      {[
+                        { color: '#0f172a', name: 'Dark' },
+                        { color: '#2563eb', name: 'Blue' },
+                        { color: '#059669', name: 'Green' },
+                        { color: '#dc2626', name: 'Red' },
+                        { color: '#d97706', name: 'Amber' },
+                        { color: '#7c3aed', name: 'Purple' }
+                      ].map(swatch => (
+                        <button
+                          key={swatch.color}
+                          type="button"
+                          onClick={() => setFormData({ ...formData, titleColor: swatch.color })}
+                          style={{ backgroundColor: swatch.color }}
+                          className={`w-5 h-5 rounded-full border border-white shadow-xs transition-transform hover:scale-125 ${formData.titleColor === swatch.color ? 'ring-2 ring-blue-500 scale-110' : ''}`}
+                          title={swatch.name}
+                        />
+                      ))}
+                    </div>
+                  </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                    Priority
-                  </label>
-                  <select
-                    value={formData.priority}
-                    onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold text-slate-800 dark:text-white outline-none"
-                  >
-                    <option value="Normal">Normal</option>
-                    <option value="High">High (Top)</option>
-                    <option value="Low">Low</option>
-                  </select>
+                  {/* Description Color */}
+                  <div className="space-y-1.5">
+                    <span className="text-[10px] text-slate-500 font-bold block">Description Font Color</span>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={formData.descriptionColor || '#475569'}
+                        onChange={(e) => setFormData({ ...formData, descriptionColor: e.target.value })}
+                        className="w-9 h-9 p-0.5 rounded-xl border border-slate-200 dark:border-slate-700 cursor-pointer bg-white"
+                        title="Pick Custom Color"
+                      />
+                      <input
+                        type="text"
+                        value={formData.descriptionColor}
+                        onChange={(e) => setFormData({ ...formData, descriptionColor: e.target.value })}
+                        placeholder="#475569 (Default)"
+                        className="flex-1 px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-mono font-bold text-slate-800 dark:text-white"
+                      />
+                    </div>
+                    {/* Quick Color Swatches */}
+                    <div className="flex items-center gap-1.5 pt-1">
+                      {[
+                        { color: '#475569', name: 'Slate' },
+                        { color: '#1e293b', name: 'Charcoal' },
+                        { color: '#1e40af', name: 'Navy' },
+                        { color: '#065f46', name: 'Forest' },
+                        { color: '#991b1b', name: 'Wine' },
+                        { color: '#78350f', name: 'Bronze' }
+                      ].map(swatch => (
+                        <button
+                          key={swatch.color}
+                          type="button"
+                          onClick={() => setFormData({ ...formData, descriptionColor: swatch.color })}
+                          style={{ backgroundColor: swatch.color }}
+                          className={`w-5 h-5 rounded-full border border-white shadow-xs transition-transform hover:scale-125 ${formData.descriptionColor === swatch.color ? 'ring-2 ring-blue-500 scale-110' : ''}`}
+                          title={swatch.name}
+                        />
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* Scheduling & Expiry */}
+              {/* Category Type (with Gradient Letters) & Priority */}
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                    Category Type (Letter Gradient Style)
+                  </label>
+                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                    {CATEGORIES.map((cat) => {
+                      const isSelected = formData.type === cat;
+                      const catGrad = getCategoryGradient(cat);
+                      return (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => setFormData({ ...formData, type: cat })}
+                          className={`py-2.5 px-2 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-1 ${
+                            isSelected
+                              ? 'bg-white dark:bg-slate-800 border-blue-500 ring-2 ring-blue-500/20 shadow-md scale-105'
+                              : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 hover:border-slate-300'
+                          }`}
+                        >
+                          <span className={`w-1.5 h-1.5 rounded-full ${catGrad.dot}`} />
+                          <span className={`text-[11px] font-black uppercase tracking-wider ${catGrad.textGradient}`}>
+                            {cat}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                      Badge Text
+                    </label>
+                    <input
+                      value={formData.badge}
+                      onChange={(e) => setFormData({ ...formData, badge: e.target.value })}
+                      className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold text-slate-800 dark:text-white outline-none"
+                      placeholder="LIVE"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                      Priority Order
+                    </label>
+                    <select
+                      value={formData.priority}
+                      onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+                      className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold text-slate-800 dark:text-white outline-none"
+                    >
+                      <option value="Normal">Normal Priority</option>
+                      <option value="High">High Priority (Top Placement)</option>
+                      <option value="Low">Low Priority</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Button Label, URL & Style */}
+              <div className="space-y-3 p-4 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-100 dark:border-slate-700">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center justify-between">
+                      <span>Action Button Label (Optional)</span>
+                      {formData.actionUrl && !formData.actionText && (
+                        <span className="text-[9px] text-blue-500 font-bold lowercase">(defaults to: "apply now")</span>
+                      )}
+                    </label>
+                    <input
+                      value={formData.actionText}
+                      onChange={(e) => setFormData({ ...formData, actionText: e.target.value })}
+                      className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-white outline-none"
+                      placeholder="e.g. Apply Now or View Details"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                      Action URL / Route (Optional)
+                    </label>
+                    <input
+                      value={formData.actionUrl}
+                      onChange={(e) => setFormData({ ...formData, actionUrl: e.target.value })}
+                      className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-white outline-none"
+                      placeholder="e.g. /services/pan or https://..."
+                    />
+                  </div>
+                </div>
+
+                {/* Button Color/Gradient Selector */}
+                <div className="space-y-1.5 pt-1">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                    Apply Now Button Color Style
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, actionButtonStyle: 'blue' })}
+                      className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+                        formData.actionButtonStyle !== 'gradient'
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                          : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      <span className="w-2.5 h-2.5 rounded-full bg-white shadow-xs" />
+                      <span>Solid Blue (Classic)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, actionButtonStyle: 'gradient' })}
+                      className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+                        formData.actionButtonStyle === 'gradient'
+                          ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white border-transparent shadow-sm'
+                          : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      <span className="w-2.5 h-2.5 rounded-full bg-gradient-to-r from-amber-400 to-pink-500 shadow-xs" />
+                      <span>Multicolor Gradient</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Compact & Professional Date Picker (Start & Expiry with Calendar icon default Today 12:00 AM) */}
               <div className="space-y-3 p-4 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-100 dark:border-slate-700">
                 <div className="flex items-center justify-between">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
@@ -1184,7 +1480,7 @@ const LiveNoticesManager: React.FC = () => {
                       type="checkbox"
                       checked={formData.isLifetime}
                       onChange={(e) => setFormData({ ...formData, isLifetime: e.target.checked })}
-                      className="w-4 h-4 text-emerald-600 rounded"
+                      className="w-4 h-4 text-emerald-600 rounded cursor-pointer"
                     />
                     <span className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400">
                       Lifetime Notice (Never Expires)
@@ -1192,61 +1488,123 @@ const LiveNoticesManager: React.FC = () => {
                   </label>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  {/* Start Date & Time */}
                   <div className="space-y-1">
-                    <span className="text-[10px] text-slate-400 font-bold block">Start Date & Time (Optional)</span>
-                    <input
-                      type="datetime-local"
-                      value={formData.startDate}
-                      onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                      className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-white"
-                    />
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-slate-500 font-bold">Start Date & Time (Optional)</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const now = new Date();
+                          const y = now.getFullYear();
+                          const m = String(now.getMonth() + 1).padStart(2, '0');
+                          const d = String(now.getDate()).padStart(2, '0');
+                          setFormData({ ...formData, startDate: `${y}-${m}-${d}T00:00` });
+                        }}
+                        className="text-[9px] font-black uppercase text-blue-600 hover:text-blue-700 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-md flex items-center gap-1 transition-all cursor-pointer"
+                        title="Set to Current Date at 12:00 AM"
+                      >
+                        <Calendar className="w-3 h-3" />
+                        <span>Today 12:00 AM</span>
+                      </button>
+                    </div>
+
+                    <div className="relative flex items-center">
+                      <input
+                        type="datetime-local"
+                        value={formData.startDate}
+                        onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                        className="w-full pl-3 pr-10 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-white outline-none focus:border-blue-500 transition-colors shadow-xs"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const now = new Date();
+                          const y = now.getFullYear();
+                          const m = String(now.getMonth() + 1).padStart(2, '0');
+                          const d = String(now.getDate()).padStart(2, '0');
+                          setFormData({ ...formData, startDate: `${y}-${m}-${d}T00:00` });
+                        }}
+                        className="absolute right-2 p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/40 rounded-lg transition-colors cursor-pointer"
+                        title="Click to set Current Date at 12:00 AM"
+                      >
+                        <Calendar className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
 
+                  {/* Expiry Date & Time */}
                   <div className="space-y-1">
-                    <span className="text-[10px] text-slate-400 font-bold block">
-                      Expiry Date & Time {!formData.isLifetime ? '(Automatic Removal)' : '(Disabled - Lifetime)'}
-                    </span>
-                    <input
-                      type="datetime-local"
-                      disabled={formData.isLifetime}
-                      value={formData.expiryDate}
-                      onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
-                      className={`w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-white ${
-                        formData.isLifetime ? 'opacity-40 cursor-not-allowed' : ''
-                      }`}
-                    />
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-slate-500 font-bold">
+                        Expiry Date {!formData.isLifetime ? '(Automatic Removal)' : '(Lifetime Active)'}
+                      </span>
+                      {!formData.isLifetime && (
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const now = new Date();
+                              const y = now.getFullYear();
+                              const m = String(now.getMonth() + 1).padStart(2, '0');
+                              const d = String(now.getDate()).padStart(2, '0');
+                              setFormData({ ...formData, expiryDate: `${y}-${m}-${d}T00:00` });
+                            }}
+                            className="text-[9px] font-black uppercase text-amber-600 hover:text-amber-700 bg-amber-50 dark:bg-amber-900/30 px-2 py-0.5 rounded-md flex items-center gap-1 transition-all cursor-pointer"
+                            title="Set to Current Date at 12:00 AM"
+                          >
+                            <Calendar className="w-3 h-3" />
+                            <span>Today 12:00 AM</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const now = new Date();
+                              now.setDate(now.getDate() + 30);
+                              const y = now.getFullYear();
+                              const m = String(now.getMonth() + 1).padStart(2, '0');
+                              const d = String(now.getDate()).padStart(2, '0');
+                              setFormData({ ...formData, expiryDate: `${y}-${m}-${d}T00:00` });
+                            }}
+                            className="text-[9px] font-black uppercase text-emerald-600 hover:text-emerald-700 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-0.5 rounded-md transition-all cursor-pointer"
+                            title="Set +30 Days at 12:00 AM"
+                          >
+                            +30d
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="relative flex items-center">
+                      <input
+                        type="datetime-local"
+                        disabled={formData.isLifetime}
+                        value={formData.expiryDate}
+                        onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
+                        className={`w-full pl-3 pr-10 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-white outline-none focus:border-blue-500 transition-colors shadow-xs ${
+                          formData.isLifetime ? 'opacity-40 cursor-not-allowed bg-slate-100 dark:bg-slate-900' : ''
+                        }`}
+                      />
+                      <button
+                        type="button"
+                        disabled={formData.isLifetime}
+                        onClick={() => {
+                          const now = new Date();
+                          const y = now.getFullYear();
+                          const m = String(now.getMonth() + 1).padStart(2, '0');
+                          const d = String(now.getDate()).padStart(2, '0');
+                          setFormData({ ...formData, expiryDate: `${y}-${m}-${d}T00:00` });
+                        }}
+                        className={`absolute right-2 p-1.5 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/40 rounded-lg transition-colors cursor-pointer ${
+                          formData.isLifetime ? 'opacity-40 cursor-not-allowed pointer-events-none' : ''
+                        }`}
+                        title="Click to set Current Date at 12:00 AM"
+                      >
+                        <Calendar className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
-                </div>
-              </div>
-
-              {/* Action Button & URL */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center justify-between">
-                    <span>Action Button Label (Optional)</span>
-                    {formData.actionUrl && !formData.actionText && (
-                      <span className="text-[9px] text-blue-500 font-bold lowercase">(defaults to: "apply now")</span>
-                    )}
-                  </label>
-                  <input
-                    value={formData.actionText}
-                    onChange={(e) => setFormData({ ...formData, actionText: e.target.value })}
-                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold text-slate-800 dark:text-white outline-none"
-                    placeholder="e.g. Apply Now or View Details"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                    Action URL / Route (Optional)
-                  </label>
-                  <input
-                    value={formData.actionUrl}
-                    onChange={(e) => setFormData({ ...formData, actionUrl: e.target.value })}
-                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold text-slate-800 dark:text-white outline-none"
-                    placeholder="e.g. /services/pan or https://..."
-                  />
                 </div>
               </div>
 

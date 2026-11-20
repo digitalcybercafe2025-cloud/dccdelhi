@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Trash2, Plus } from 'lucide-react';
+import { Trash2, Plus, Search, LayoutGrid, List, Settings, X, Download } from 'lucide-react';
 import api, { getMediaUrl } from '../../api/axios';
 import {
     MASTER_DOCUMENT_LIST,
@@ -43,6 +43,9 @@ const ServicesManager: React.FC = () => {
     const [saving, setSaving] = useState(false);
     const [search, setSearch] = useState('');
     const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => (localStorage.getItem('admin_services_view') as any) || 'grid');
+    const [showSettingsModal, setShowSettingsModal] = useState(false);
+    const [sortBy, setSortBy] = useState<'priority' | 'name' | 'priceAsc' | 'priceDesc'>('priority');
+    const [filterCategory, setFilterCategory] = useState<string>('all');
     const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -301,30 +304,105 @@ const ServicesManager: React.FC = () => {
         catch { alert('Delete failed'); }
     };
 
-    const filtered = services.filter(s => s.title?.toLowerCase().includes(search.toLowerCase()) || s.category?.toLowerCase().includes(search.toLowerCase()));
+    const exportServicesToCSV = () => {
+        if (services.length === 0) {
+            alert('No services to export.');
+            return;
+        }
+        const headers = ['Service Title', 'Category', 'Base Fee', 'Priority', 'Estimated Days', 'Status', 'Required Documents'];
+        const rows = services.map(s => [
+            `"${s.title || ''}"`,
+            `"${s.category || ''}"`,
+            `"${s.fee || 0}"`,
+            `"${s.priority || 0}"`,
+            `"${s.estimatedDays || ''}"`,
+            `"${s.active ? 'Active' : 'Disabled'}"`,
+            `"${(s.requiredDocs || '').replace(/"/g, '""')}"`
+        ]);
+        const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement('a');
+        link.setAttribute('href', encodedUri);
+        link.setAttribute('download', `services_catalog_${new Date().toISOString().slice(0, 10)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    const categoriesList = Array.from(new Set(services.map(s => s.category).filter(Boolean)));
+
+    const filtered = services.filter(s => {
+        const matchesSearch = s.title?.toLowerCase().includes(search.toLowerCase()) || s.category?.toLowerCase().includes(search.toLowerCase());
+        if (!matchesSearch) return false;
+        if (filterCategory !== 'all' && s.category !== filterCategory) return false;
+        return true;
+    }).sort((a, b) => {
+        if (sortBy === 'name') return (a.title || '').localeCompare(b.title || '');
+        if (sortBy === 'priceAsc') return (a.fee || 0) - (b.fee || 0);
+        if (sortBy === 'priceDesc') return (b.fee || 0) - (a.fee || 0);
+        return (b.priority || 0) - (a.priority || 0);
+    });
 
     return (
-        <div className="space-y-4">
-            {/* ── Header bar ── */}
-            <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between bg-white p-4 rounded-3xl border border-slate-100 shadow-sm transition-all duration-300">
-                <div className="flex flex-1 items-center gap-4">
-                    <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search services..."
-                        className={`flex-1 max-w-sm ${inputCls}`} />
-                    {/* View Toggle */}
-                    <div className="flex items-center bg-slate-100 p-1 rounded-xl">
-                        <button onClick={() => setViewMode('grid')} className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}>
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /></svg>
-                        </button>
-                        <button onClick={() => setViewMode('list')} className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}>
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></svg>
-                        </button>
+        <div className="space-y-4 animate-in fade-in duration-300">
+            {/* ── Header bar (Matching exact reference screenshot layout) ── */}
+            <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center justify-between bg-white p-4 sm:p-5 rounded-3xl border border-slate-100 shadow-sm transition-all duration-300">
+                {/* Left: Search input with Search Icon on right side */}
+                <div className="flex flex-1 items-center gap-3">
+                    <div className="relative flex-1 max-w-sm">
+                        <input
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                            placeholder="Search services..."
+                            className="w-full pl-4 pr-10 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 placeholder:text-slate-400 text-sm font-bold outline-none focus:border-blue-400 transition-colors shadow-sm"
+                        />
+                        <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                     </div>
                 </div>
-                <button onClick={openAdd}
-                    className="flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-blue-500/20 active:scale-95">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg>
-                    New Service
-                </button>
+
+                {/* Right controls: [ Grid | List ] toggle -> [ ⚙ SETTINGS ] -> [ + NEW SERVICE ] */}
+                <div className="flex items-center gap-2.5 flex-wrap">
+                    {/* 1. View Toggle */}
+                    <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/70">
+                        <button
+                            type="button"
+                            onClick={() => setViewMode('grid')}
+                            className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white shadow-sm text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-700'}`}
+                            title="Grid View"
+                        >
+                            <LayoutGrid size={16} />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setViewMode('list')}
+                            className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white shadow-sm text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-700'}`}
+                            title="List View"
+                        >
+                            <List size={16} />
+                        </button>
+                    </div>
+
+                    {/* 2. Settings Button */}
+                    <button
+                        type="button"
+                        onClick={() => setShowSettingsModal(true)}
+                        className="flex items-center gap-2 px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200/80 text-slate-700 rounded-xl font-bold text-xs uppercase tracking-wider transition-all border border-slate-200 active:scale-95"
+                        title="Service Settings"
+                    >
+                        <Settings size={15} className="text-slate-500" />
+                        <span className="hidden sm:inline">Settings</span>
+                    </button>
+
+                    {/* 3. New Service Button */}
+                    <button
+                        type="button"
+                        onClick={openAdd}
+                        className="flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-md shadow-blue-500/25 active:scale-95"
+                    >
+                        <Plus size={15} strokeWidth={3} />
+                        <span>New Service</span>
+                    </button>
+                </div>
             </div>
 
             {loading ? (
@@ -779,6 +857,149 @@ const ServicesManager: React.FC = () => {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Services Settings Modal ── */}
+            {showSettingsModal && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200"
+                    onClick={() => setShowSettingsModal(false)}
+                >
+                    <div
+                        className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200 p-6 space-y-5"
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                            <div className="flex items-center gap-2.5">
+                                <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+                                    <Settings size={18} />
+                                </div>
+                                <div>
+                                    <h3 className="text-sm font-black text-slate-900 uppercase">Service Settings</h3>
+                                    <p className="text-[10px] text-slate-400 font-bold">Catalog Sorting, Category Filters & Export</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setShowSettingsModal(false)}
+                                className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        {/* Setting 1: Default View Mode */}
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
+                                Default View Mode
+                            </label>
+                            <div className="grid grid-cols-2 gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setViewMode('grid')}
+                                    className={`py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border transition-all ${
+                                        viewMode === 'grid' ? 'bg-blue-50 border-blue-500 text-blue-600' : 'bg-slate-50 border-slate-200 text-slate-600'
+                                    }`}
+                                >
+                                    <LayoutGrid size={15} /> Card Grid
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setViewMode('list')}
+                                    className={`py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border transition-all ${
+                                        viewMode === 'list' ? 'bg-blue-50 border-blue-500 text-blue-600' : 'bg-slate-50 border-slate-200 text-slate-600'
+                                    }`}
+                                >
+                                    <List size={15} /> Table List
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Setting 2: Sort By */}
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
+                                Sort Catalog Order
+                            </label>
+                            <div className="grid grid-cols-2 gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setSortBy('priority')}
+                                    className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all ${
+                                        sortBy === 'priority' ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-50 border-slate-200 text-slate-600'
+                                    }`}
+                                >
+                                    High Priority
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setSortBy('name')}
+                                    className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all ${
+                                        sortBy === 'name' ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-50 border-slate-200 text-slate-600'
+                                    }`}
+                                >
+                                    Name (A - Z)
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setSortBy('priceAsc')}
+                                    className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all ${
+                                        sortBy === 'priceAsc' ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-50 border-slate-200 text-slate-600'
+                                    }`}
+                                >
+                                    Fee: Low to High
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setSortBy('priceDesc')}
+                                    className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all ${
+                                        sortBy === 'priceDesc' ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-50 border-slate-200 text-slate-600'
+                                    }`}
+                                >
+                                    Fee: High to Low
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Setting 3: Category Filter */}
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
+                                Filter by Category
+                            </label>
+                            <select
+                                value={filterCategory}
+                                onChange={e => setFilterCategory(e.target.value)}
+                                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none"
+                            >
+                                <option value="all">All Categories ({services.length})</option>
+                                {categoriesList.map(cat => (
+                                    <option key={cat} value={cat}>{cat}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Setting 4: Data Export */}
+                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                            <div>
+                                <h4 className="text-xs font-black text-slate-800">Export Catalog</h4>
+                                <p className="text-[10px] text-slate-400 font-medium">Download services list as CSV</p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={exportServicesToCSV}
+                                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-sm flex items-center gap-1.5"
+                            >
+                                <Download size={14} /> Export CSV
+                            </button>
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={() => setShowSettingsModal(false)}
+                            className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-black uppercase tracking-wider transition-all"
+                        >
+                            Apply & Close
+                        </button>
                     </div>
                 </div>
             )}
