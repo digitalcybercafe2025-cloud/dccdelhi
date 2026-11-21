@@ -505,19 +505,16 @@ const ApplicationsManager: React.FC = () => {
                         ))}
                     </select>
 
-                    {/* 3. Compact Date Range: DD-MM-YYYY [📅] TO(GREEN) DD-MM-YYYY [📅] */}
+                    {/* 3. Compact Date Range: DD-MM-YYYY TO(GREEN) DD-MM-YYYY */}
                     <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 shrink-0">
                         {/* Start Date */}
-                        <div className="relative flex items-center shrink-0">
-                            <input
-                                type="date"
-                                value={startDate}
-                                onChange={e => setStartDate(e.target.value)}
-                                className="w-[88px] sm:w-[94px] bg-transparent border-none text-slate-700 text-[10px] sm:text-[11px] font-bold outline-none cursor-pointer pr-3"
-                                title="Start Date (DD-MM-YYYY)"
-                            />
-                            <Calendar size={12} className="text-slate-400 pointer-events-none -ml-4" />
-                        </div>
+                        <input
+                            type="date"
+                            value={startDate}
+                            onChange={e => setStartDate(e.target.value)}
+                            className="w-[92px] sm:w-[98px] bg-transparent border-none text-slate-700 text-[10px] sm:text-[11px] font-bold outline-none cursor-pointer"
+                            title="Start Date (DD-MM-YYYY)"
+                        />
 
                         {/* TO in GREEN COLOR */}
                         <span className="text-[10px] font-black uppercase text-emerald-600 px-0.5 tracking-wider shrink-0 select-none">
@@ -525,16 +522,13 @@ const ApplicationsManager: React.FC = () => {
                         </span>
 
                         {/* End Date */}
-                        <div className="relative flex items-center shrink-0">
-                            <input
-                                type="date"
-                                value={endDate}
-                                onChange={e => setEndDate(e.target.value)}
-                                className="w-[88px] sm:w-[94px] bg-transparent border-none text-slate-700 text-[10px] sm:text-[11px] font-bold outline-none cursor-pointer pr-3"
-                                title="End Date (DD-MM-YYYY)"
-                            />
-                            <Calendar size={12} className="text-slate-400 pointer-events-none -ml-4" />
-                        </div>
+                        <input
+                            type="date"
+                            value={endDate}
+                            onChange={e => setEndDate(e.target.value)}
+                            className="w-[92px] sm:w-[98px] bg-transparent border-none text-slate-700 text-[10px] sm:text-[11px] font-bold outline-none cursor-pointer"
+                            title="End Date (DD-MM-YYYY)"
+                        />
                     </div>
 
                     {hasActiveFilters && (
@@ -628,14 +622,16 @@ const ApplicationsManager: React.FC = () => {
                                     >
                                         Review Focus
                                     </button>
-                                    {canDelete && (
+                                    {canDelete ? (
                                         <button
                                             onClick={() => openDeleteAppModal(app)}
-                                            className="p-2 bg-red-50 hover:bg-red-600 text-red-500 hover:text-white rounded-xl transition-all cursor-pointer"
+                                            className="p-2 bg-red-50 hover:bg-red-600 text-red-500 hover:text-white rounded-xl transition-all cursor-pointer shrink-0"
                                             title="Delete Application"
                                         >
                                             <Trash2 className="w-4 h-4" />
                                         </button>
+                                    ) : (
+                                        <div className="w-8 h-8 shrink-0 pointer-events-none" aria-hidden="true" />
                                     )}
                                 </div>
                             </div>
@@ -695,21 +691,23 @@ const ApplicationsManager: React.FC = () => {
                                                 </span>
                                             </td>
                                             <td className="py-2.5 px-3.5 text-right whitespace-nowrap">
-                                                <div className="inline-flex items-center gap-1.5">
+                                                <div className="inline-flex items-center justify-end gap-1.5 min-w-[135px]">
                                                     <button
                                                         onClick={() => { setSelected(app); setStatusNote(app.rejectionReason || ''); }}
-                                                        className="px-3 py-1 bg-slate-800 hover:bg-blue-600 text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-all shadow-sm active:scale-95 cursor-pointer"
+                                                        className="px-3 py-1 bg-slate-800 hover:bg-blue-600 text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-all shadow-sm active:scale-95 cursor-pointer whitespace-nowrap"
                                                     >
                                                         Review Focus
                                                     </button>
-                                                    {canDelete && (
+                                                    {canDelete ? (
                                                         <button
                                                             onClick={() => openDeleteAppModal(app)}
-                                                            className="p-1 bg-red-50 hover:bg-red-600 text-red-500 hover:text-white rounded-lg transition-all cursor-pointer"
+                                                            className="p-1 bg-red-50 hover:bg-red-600 text-red-500 hover:text-white rounded-lg transition-all cursor-pointer shrink-0"
                                                             title="Delete Application"
                                                         >
                                                             <Trash2 className="w-3.5 h-3.5" />
                                                         </button>
+                                                    ) : (
+                                                        <div className="w-[22px] h-[22px] shrink-0 pointer-events-none" aria-hidden="true" />
                                                     )}
                                                 </div>
                                             </td>
